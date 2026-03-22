@@ -22,6 +22,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <NavLink href="/admin" label="ダッシュボード" />
             <NavLink href="/admin/monthly" label="月次集計" />
             <NavLink href="/admin/edit" label="打刻修正" />
+            <NavLink href="/admin/settings" label="設定" />
             <div className="ml-3 pl-3 border-l border-md-outline-variant">
               <LogoutButton />
             </div>
