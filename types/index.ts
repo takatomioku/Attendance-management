@@ -4,7 +4,9 @@ export type ActionType =
   | 'break_start'
   | 'break_end'
   | 'go_out'
-  | 'return';
+  | 'return'
+  | 'night_duty_start'
+  | 'night_duty_end';
 
 export type AttendanceStatus =
   | 'not_started'

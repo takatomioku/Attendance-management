@@ -8,6 +8,7 @@ import { ACTION_LABELS, formatTime, getJSTDateString, cn } from '@/lib/utils';
 
 const ACTION_OPTIONS: ActionType[] = [
   'clock_in', 'clock_out', 'break_start', 'break_end', 'go_out', 'return',
+  'night_duty_start', 'night_duty_end',
 ];
 
 export default function EditPage() {

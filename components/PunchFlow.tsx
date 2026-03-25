@@ -20,8 +20,10 @@ const ACTION_STYLES: Record<ActionType, string> = {
   clock_out:   'bg-md-surface-container-high text-md-on-surface hover:shadow-md-1',
   break_start: 'bg-md-warning-container text-md-on-warning-container hover:shadow-md-1',
   break_end:   'bg-md-warning-container text-md-on-warning-container hover:shadow-md-1',
-  go_out:      'bg-md-secondary-container text-md-on-secondary-container hover:shadow-md-1',
-  return:      'bg-md-secondary-container text-md-on-secondary-container hover:shadow-md-1',
+  go_out:            'bg-md-secondary-container text-md-on-secondary-container hover:shadow-md-1',
+  return:            'bg-md-secondary-container text-md-on-secondary-container hover:shadow-md-1',
+  night_duty_start:  'bg-md-night-container text-md-on-night-container hover:shadow-md-1',
+  night_duty_end:    'bg-md-night-container text-md-on-night-container hover:shadow-md-1',
 };
 
 const fadeSlide = {

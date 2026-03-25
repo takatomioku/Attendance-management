@@ -26,6 +26,8 @@
   --md-sys-color-on-error-container:       #410e0b;
   --md-sys-color-warning-container:        #fff3e0;
   --md-sys-color-on-warning-container:     #4e2000;
+  --md-sys-color-night-container:          #dde4f0;
+  --md-sys-color-on-night-container:       #1c2f5e;
 
   /* MD3 State layers */
   --md-state-primary-hover:  rgba(0, 150, 136, 0.08);

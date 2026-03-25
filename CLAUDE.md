@@ -25,12 +25,33 @@ rm -rf .next node_modules && npm install
 
 ```
 ブラウザ（スマホ/PC）
-  └─ fetch('/api/...') のみ でサーバーと通信
+  └─ fetch('/api/...') のみでサーバーと通信
        └─ APIルート（app/api/**/route.ts）
             └─ createServiceClient() でSupabase操作（service_roleキー使用）
 ```
 
 フロントエンドから Supabase へ直接アクセスしない。すべてAPIルート経由。
+
+### APIルート一覧
+
+| ルート | メソッド | 用途 |
+|--------|---------|------|
+| `/api/staff` | GET | 職員一覧取得（打刻画面用） |
+| `/api/attendance` | GET / POST | 打刻送信・当日履歴取得 |
+| `/api/attendance/status` | GET | 職員の最終打刻状態取得 |
+| `/api/admin/records` | GET / POST | 管理者用打刻記録の取得・追加 |
+| `/api/admin/records/[id]` | PUT / DELETE | 個別レコードの編集・削除 |
+| `/api/admin/export` | GET | CSVエクスポート |
+| `/api/admin/cleanup` | GET / DELETE | 古いデータの件数確認・一括削除 |
+
+### 管理者画面一覧
+
+| パス | 内容 |
+|------|------|
+| `/admin` | ダッシュボード（当日の職員ステータス一覧） |
+| `/admin/monthly` | 月次集計 |
+| `/admin/edit` | 打刻修正（レコードの追加・編集・削除） |
+| `/admin/settings` | 設定（古いデータの一括削除） |
 
 ### Supabaseクライアントの使い分け
 
@@ -76,19 +97,46 @@ clock_out → clock_in  （複数セッション対応）
 
 ## UIデザイン方針
 
-- スタイル: ミニマル・クリニカル（医療系）
-- カラー: ホワイト背景、アクセントにティールグリーン（#009688）
+- スタイル: Material Design 3 ベース、ミニマル・クリニカル（医療系）
+- カラー: ホワイト背景、アクセントにティールグリーン（#009688）をMD3 primaryとして使用
 - フォント: 日本語は Noto Sans JP、英数字は DM Sans
-- アニメーション: 控えめ、フェードイン中心
+- アニメーション: Framer Motion、控えめなフェードスライド中心
 - **絶対に使わないもの**: 汎用的な紫グラデーション、Inter / Arial
 
 ## UIコーディングルール
 
-- カラーは CSS変数で管理し、**直書き禁止**
-  - `bg-primary` / `bg-primary-dark` / `text-primary`（`tailwind.config.ts` で CSS変数にマッピング済み）
-  - `bg-[#009688]` のような直書きは違反
-- ボタンには `hover:` / `focus-visible:` のマイクロインタラクションを入れる
-- リアルタイム時計など「サーバーとクライアントで値が変わる要素」は `useState(null)` で初期化し、`useEffect` 内でセット（Hydrationエラー防止）
+### カラー管理（CSS変数 — 直書き禁止）
+
+`app/globals.css` に2層構造で定義：
+
+```
+MD3トークン（--md-sys-color-*）
+  └─ 後方互換エイリアス（--color-primary など）
+       └─ Tailwindクラス（bg-primary, text-primary など）
+```
+
+- **MD3カラーロール**を使うこと: `bg-md-surface`, `text-md-on-surface-variant`, `bg-md-primary-container` など
+- `bg-[#009688]` のような直書きは違反
+- 状態レイヤーは `var(--md-state-primary-hover)` / `var(--md-state-primary-focus)` を使う
+
+### MD3シェイプ・エレベーション
+
+```
+角丸: rounded-md-sm(8px) / md-md(12px) / md-lg(16px) / md-xl(28px) / md-full(pill)
+影:   shadow-md-1 / shadow-md-2 / shadow-md-3
+```
+
+### ボタンの種類
+
+| 種類 | 実装 | 用途 |
+|------|------|------|
+| Filled Button | `bg-primary text-white rounded-md-full` | 主要アクション |
+| Filled Tonal | `bg-md-primary-container text-md-on-primary-container rounded-md-full` | 副次アクション |
+| Outlined Card | `border border-md-outline-variant rounded-md-lg` | 選択肢リスト |
+
+### Hydrationエラー防止
+
+リアルタイム時計など「サーバーとクライアントで値が変わる要素」は `useState(null)` で初期化し、`useEffect` 内でセット。
 
 ## 環境変数（.env.local）
 
@@ -98,7 +146,7 @@ clock_out → clock_in  （複数セッション対応）
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 公開可 | 匿名キー（Auth用） |
 | `SUPABASE_SERVICE_ROLE_KEY` | **秘密** | サービスロールキー（APIルートのみ） |
 
-`NEXT_PUBLIC_` なし変数はブラウザに露出しない。`SUPABASE_SERVICE_ROLE_KEY` は絶対に `NEXT_PUBLIC_` をつけない。
+`SUPABASE_SERVICE_ROLE_KEY` は絶対に `NEXT_PUBLIC_` をつけない。
 
 ## Supabaseスキーマ
 
@@ -108,14 +156,14 @@ clock_out → clock_in  （複数セッション対応）
 
 `action` の値: `clock_in` / `clock_out` / `break_start` / `break_end` / `go_out` / `return`
 
-## アーキテクチャルール
+## デプロイ
 
-- ディレクトリ構成は `app/` ベースの App Router を使用する
-- コンポーネントは **Server Components を基本** とする
-- ユーザー操作・状態管理が必要なUIのみ `"use client"` を付ける
-- 型定義は `types/index.ts` にまとめる
+- ホスティング: Vercel（GitHub `main` ブランチへのpushで自動デプロイ）
+- リポジトリ: `takatomioku/Attendance-management`（Public）
+- Supabase の **Authentication → URL Configuration** に Vercel の URL を設定しないと管理者ログイン不可
 
 ## 注意事項
 
 - Node.js v22 では `next.config.ts` が非対応のため `next.config.js` を使用する
 - `package.json` の依存関係はバージョンを明示（`^` による自動更新防止）
+- `.next/` と `node_modules/` は `.gitignore` で除外済み（大きいバイナリファイルがあるためGitHubの100MB制限に注意）

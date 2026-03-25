@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
   action TEXT NOT NULL CHECK (
-    action IN ('clock_in', 'clock_out', 'break_start', 'break_end', 'go_out', 'return')
+    action IN ('clock_in', 'clock_out', 'break_start', 'break_end', 'go_out', 'return', 'night_duty_start', 'night_duty_end')
   ),
   timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   work_date DATE NOT NULL,

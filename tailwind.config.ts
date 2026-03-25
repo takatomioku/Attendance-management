@@ -32,6 +32,8 @@ const config: Config = {
           'on-error-container':   'var(--md-sys-color-on-error-container)',
           'warning-container':    'var(--md-sys-color-warning-container)',
           'on-warning-container': 'var(--md-sys-color-on-warning-container)',
+          'night-container':      'var(--md-sys-color-night-container)',
+          'on-night-container':   'var(--md-sys-color-on-night-container)',
         },
       },
       borderRadius: {

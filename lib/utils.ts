@@ -13,16 +13,20 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   break_end: '休憩終了',
   go_out: '外出',
   return: '帰院',
+  night_duty_start: '夜間当番開始',
+  night_duty_end: '夜間当番終了',
 };
 
 // 最後の打刻から次に選択できる操作を定義
 export const ACTION_FLOW: Record<string, ActionType[]> = {
   none: ['clock_in'],
-  clock_in: ['break_start', 'go_out', 'clock_out'],
+  clock_in: ['break_start', 'go_out', 'night_duty_start', 'clock_out'],
   break_start: ['break_end'],
-  break_end: ['break_start', 'go_out', 'clock_out'],
+  break_end: ['break_start', 'go_out', 'night_duty_start', 'clock_out'],
   go_out: ['return'],
-  return: ['break_start', 'go_out', 'clock_out'],
+  return: ['break_start', 'go_out', 'night_duty_start', 'clock_out'],
+  night_duty_start: ['night_duty_end'],
+  night_duty_end: ['break_start', 'go_out', 'night_duty_start', 'clock_out'],
   clock_out: ['clock_in'], // 複数セッション対応
 };
 
@@ -40,6 +44,8 @@ export function getStatusFromAction(action: ActionType | null): AttendanceStatus
     case 'break_end': return 'working';
     case 'go_out': return 'out';
     case 'return': return 'working';
+    case 'night_duty_start': return 'working';
+    case 'night_duty_end': return 'working';
   }
 }
 

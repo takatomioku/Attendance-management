@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import {
   getJSTDateString,
   getStatusFromAction,
+  ACTION_LABELS,
   STATUS_LABELS,
   STATUS_BADGE_CLASS,
   calculateWorkHours,
@@ -123,13 +124,7 @@ export default async function AdminDashboard() {
                             key={r.id}
                             className="text-xs bg-md-surface-container text-md-on-surface-variant px-2.5 py-0.5 rounded-md-xs font-dm"
                           >
-                            {
-                              {
-                                clock_in: '出勤', clock_out: '退勤',
-                                break_start: '休憩開始', break_end: '休憩終了',
-                                go_out: '外出', return: '帰院',
-                              }[r.action as ActionType]
-                            }{' '}
+                            {ACTION_LABELS[r.action as ActionType]}{' '}
                             {formatTime(r.timestamp)}
                           </span>
                         ))}
