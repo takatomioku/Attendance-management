@@ -33,7 +33,13 @@ const fadeSlide = {
   transition: { duration: 0.18 },
 };
 
-export function PunchFlow({ staffList }: { staffList: Staff[] }) {
+export function PunchFlow({
+  staffList,
+  initialStatuses,
+}: {
+  staffList: Staff[];
+  initialStatuses: Record<string, ActionType | null>;
+}) {
   const [step, setStep] = useState<Step>('select_name');
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [selectedAction, setSelectedAction] = useState<ActionType | null>(null);
@@ -59,25 +65,12 @@ export function PunchFlow({ staffList }: { staffList: Staff[] }) {
     return () => clearTimeout(id);
   }, [step]);
 
-  const handleSelectName = useCallback(async (staff: Staff) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const jstDate = new Date(Date.now() + 9 * 3600000).toISOString().split('T')[0];
-      const res = await fetch(`/api/attendance/status?staff_id=${staff.id}&date=${jstDate}`);
-      if (!res.ok) throw new Error();
-      const records = await res.json();
-      const lastAction: ActionType | null =
-        records.length > 0 ? records[records.length - 1].action : null;
-      setSelectedStaff(staff);
-      setAvailableActions(getAvailableActions(lastAction));
-      setStep('select_action');
-    } catch {
-      setError('通信エラーが発生しました。もう一度お試しください。');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const handleSelectName = useCallback((staff: Staff) => {
+    const lastAction = initialStatuses[staff.id] ?? null;
+    setSelectedStaff(staff);
+    setAvailableActions(getAvailableActions(lastAction));
+    setStep('select_action');
+  }, [initialStatuses]);
 
   const handleConfirm = useCallback(async () => {
     if (!selectedStaff || !selectedAction) return;
