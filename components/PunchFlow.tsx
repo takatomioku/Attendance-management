@@ -55,6 +55,8 @@ export function PunchFlow({
   const [now, setNow] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // ページロード後の打刻でも最新ステータスを反映するためローカルで追跡
+  const [currentStatuses, setCurrentStatuses] = useState<Record<string, ActionType | null>>(initialStatuses);
   // Memo states
   const [memoStaff, setMemoStaff] = useState<Staff | null>(null);
   const [memoDate, setMemoDate] = useState('');
@@ -88,11 +90,11 @@ export function PunchFlow({
   }, [step]);
 
   const handleSelectName = useCallback((staff: Staff) => {
-    const lastAction = initialStatuses[staff.id] ?? null;
+    const lastAction = currentStatuses[staff.id] ?? null;
     setSelectedStaff(staff);
     setAvailableActions(getAvailableActions(lastAction));
     setStep('select_action');
-  }, [initialStatuses]);
+  }, [currentStatuses]);
 
   const handleConfirm = useCallback(async () => {
     if (!selectedStaff || !selectedAction) return;
@@ -105,6 +107,8 @@ export function PunchFlow({
         body: JSON.stringify({ staff_id: selectedStaff.id, action: selectedAction }),
       });
       if (!res.ok) throw new Error();
+      // 打刻成功後にローカルステータスを更新（ページ再読み込みなしで次の操作を正しく表示）
+      setCurrentStatuses((prev) => ({ ...prev, [selectedStaff.id]: selectedAction }));
       setStep('success');
     } catch {
       setError('打刻に失敗しました。もう一度お試しください。');
