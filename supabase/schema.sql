@@ -47,21 +47,39 @@ CREATE POLICY "Public insert attendance" ON attendance_records
 CREATE POLICY "Public read attendance" ON attendance_records
   FOR SELECT USING (true);
 
+-- 連絡メモテーブル
+CREATE TABLE IF NOT EXISTS staff_memos (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  memo_date DATE NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_staff_memos_staff_date ON staff_memos(staff_id, memo_date);
+
+ALTER TABLE staff_memos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public insert memos" ON staff_memos
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Public read memos" ON staff_memos
+  FOR SELECT USING (true);
+
 -- =============================================
--- 初期データ：職員12名の登録例
--- 実際の名前に変更してください
+-- 初期データ：職員
 -- =============================================
 
 INSERT INTO staff (name, display_order) VALUES
-  ('山田 太郎', 1),
-  ('鈴木 花子', 2),
-  ('田中 一郎', 3),
-  ('佐藤 美咲', 4),
-  ('伊藤 健二', 5),
-  ('渡辺 さくら', 6),
-  ('中村 誠', 7),
-  ('小林 陽子', 8),
-  ('加藤 大輔', 9),
-  ('吉田 涼子', 10),
-  ('山本 拓也', 11),
-  ('松本 由美', 12);
+  ('宮下 司', 1),
+  ('桑原 利佳', 2),
+  ('山口 志保 ', 3),
+  ('坂井 香代子', 4),
+  ('富樫 綾子', 5),
+  ('関 美織', 6),
+  ('今野 知美', 7),
+  ('竹内 理紗', 8),
+  ('加来 景子', 9),
+  ('秋山 広美', 10),
+  ('江崎 亜胡', 11),
+  ('加茂 里見', 12);

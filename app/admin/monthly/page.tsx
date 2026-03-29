@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
-import { Staff, AttendanceRecord, ActionType } from '@/types';
+import { Staff, AttendanceRecord, ActionType, StaffMemo } from '@/types';
 import { calculateWorkHours, formatTime, ACTION_LABELS } from '@/lib/utils';
 
 type DaySummary = {
@@ -12,6 +12,7 @@ type DaySummary = {
   workHours: number | null;
   isOvertime: boolean;
   hasMissedPunch: boolean;
+  memo: string | null;
 };
 
 type StaffSummary = {
@@ -45,18 +46,21 @@ export default function MonthlyPage() {
   const [yearMonth, setYearMonth] = useState(getCurrentYearMonth());
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [memos, setMemos] = useState<StaffMemo[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedStaff, setExpandedStaff] = useState<string | null>(null);
 
   const fetchData = useCallback(async (ym: string) => {
     setLoading(true);
     try {
-      const [staffRes, recRes] = await Promise.all([
+      const [staffRes, recRes, memosRes] = await Promise.all([
         fetch('/api/staff'),
         fetch(`/api/admin/records?month=${ym}`),
+        fetch(`/api/memos?month=${ym}`),
       ]);
       setStaffList(await staffRes.json());
       setRecords(await recRes.json());
+      setMemos(await memosRes.json());
     } finally {
       setLoading(false);
     }
@@ -68,8 +72,10 @@ export default function MonthlyPage() {
 
   const summaries: StaffSummary[] = staffList.map((s) => {
     const myRecords = records.filter((r) => r.staff_id === s.id);
+    const myMemos = memos.filter((m) => m.staff_id === s.id);
     const daySummaries = days.map((date) => {
       const dayRecs = myRecords.filter((r) => r.work_date === date);
+      const dayMemos = myMemos.filter((m) => m.memo_date === date);
       const hasClockedIn = dayRecs.some((r) => r.action === 'clock_in');
       const hasClockedOut = dayRecs.some((r) => r.action === 'clock_out');
       const workHours = dayRecs.length > 0 ? calculateWorkHours(dayRecs) : null;
@@ -79,6 +85,7 @@ export default function MonthlyPage() {
         workHours,
         isOvertime: (workHours ?? 0) > 8,
         hasMissedPunch: hasClockedIn && !hasClockedOut,
+        memo: dayMemos.length > 0 ? dayMemos.map((m) => m.content).join('、') : null,
       };
     });
     const totalHours = daySummaries.reduce((sum, d) => sum + (d.workHours ?? 0), 0);
@@ -192,11 +199,12 @@ export default function MonthlyPage() {
                           <th className="text-left px-6 py-2.5 font-medium">勤務時間</th>
                           <th className="text-left px-6 py-2.5 font-medium">打刻記録</th>
                           <th className="text-left px-6 py-2.5 font-medium">備考</th>
+                          <th className="text-left px-6 py-2.5 font-medium">連絡メモ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-md-outline-variant/30">
                         {s.days
-                          .filter((d) => d.records.length > 0)
+                          .filter((d) => d.records.length > 0 || d.memo)
                           .map((d) => (
                             <tr key={d.date} className="hover:bg-md-surface-container transition-colors duration-md-s4">
                               <td className="px-6 py-2.5 font-dm text-md-on-surface-variant">
@@ -232,11 +240,18 @@ export default function MonthlyPage() {
                                   <span className="text-md-on-error-container ml-1">退勤未打刻</span>
                                 )}
                               </td>
+                              <td className="px-6 py-2.5 text-xs text-md-on-surface-variant max-w-xs">
+                                {d.memo ? (
+                                  <span className="whitespace-pre-wrap">{d.memo}</span>
+                                ) : (
+                                  <span className="text-md-on-surface-variant/30">—</span>
+                                )}
+                              </td>
                             </tr>
                           ))}
-                        {s.days.filter((d) => d.records.length > 0).length === 0 && (
+                        {s.days.filter((d) => d.records.length > 0 || d.memo).length === 0 && (
                           <tr>
-                            <td colSpan={4} className="px-6 py-4 text-center text-md-on-surface-variant/40 text-sm">
+                            <td colSpan={5} className="px-6 py-4 text-center text-md-on-surface-variant/40 text-sm">
                               記録なし
                             </td>
                           </tr>

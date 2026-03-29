@@ -23,26 +23,30 @@ rm -rf .next node_modules && npm install
 
 ### データフロー
 
-```
-ブラウザ（スマホ/PC）
-  └─ fetch('/api/...') のみでサーバーと通信
-       └─ APIルート（app/api/**/route.ts）
-            └─ createServiceClient() でSupabase操作（service_roleキー使用）
-```
+**ブラウザ（クライアント）から Supabase へ直接アクセスしない。** アクセス経路は2種類：
 
-フロントエンドから Supabase へ直接アクセスしない。すべてAPIルート経由。
+```
+① Server Components（app/page.tsx, app/admin/page.tsx など）
+     └─ createServiceClient() で Supabase を直接操作
+          └─ props として Client Components へ渡す
+
+② Client Components のユーザー操作（打刻送信・レコード編集など）
+     └─ fetch('/api/...') でAPIルートへ
+          └─ createServiceClient() でSupabase操作（service_roleキー使用）
+```
 
 ### APIルート一覧
 
 | ルート | メソッド | 用途 |
 |--------|---------|------|
-| `/api/staff` | GET | 職員一覧取得（打刻画面用） |
+| `/api/staff` | GET | 職員一覧取得 |
 | `/api/attendance` | GET / POST | 打刻送信・当日履歴取得 |
-| `/api/attendance/status` | GET | 職員の最終打刻状態取得 |
+| `/api/attendance/status` | GET | 職員の最終打刻状態取得（単件） |
 | `/api/admin/records` | GET / POST | 管理者用打刻記録の取得・追加 |
 | `/api/admin/records/[id]` | PUT / DELETE | 個別レコードの編集・削除 |
-| `/api/admin/export` | GET | CSVエクスポート |
+| `/api/admin/export` | GET | Excelエクスポート（職員別シート、J列に連絡メモ） |
 | `/api/admin/cleanup` | GET / DELETE | 古いデータの件数確認・一括削除 |
+| `/api/memos` | GET / POST | 連絡メモの取得・投稿（`?month=YYYY-MM` でフィルタ） |
 
 ### 管理者画面一覧
 
@@ -52,6 +56,8 @@ rm -rf .next node_modules && npm install
 | `/admin/monthly` | 月次集計 |
 | `/admin/edit` | 打刻修正（レコードの追加・編集・削除） |
 | `/admin/settings` | 設定（古いデータの一括削除） |
+
+`app/admin/layout.tsx` が管理者共通レイアウト（ログアウトボタン等）を提供。`components/admin/LogoutButton.tsx` がログアウト処理を担当。
 
 ### Supabaseクライアントの使い分け
 
@@ -67,17 +73,25 @@ rm -rf .next node_modules && npm install
 - `middleware.ts` が `/admin/*` を保護（`/admin/login` は除外）
 - 職員の打刻画面（`/`）は認証なし
 
+### 打刻画面のデータ取得
+
+`app/page.tsx`（Server Component）がページ読み込み時に職員一覧と当日の全打刻記録を `Promise.all` で並列取得し、`initialStatuses: Record<string, ActionType | null>` として `PunchFlow` へ渡す。
+
+これにより職員名タップ時の `/api/attendance/status` 呼び出しは不要になっている（`PunchFlow.tsx` の `handleSelectName` は同期処理）。
+
 ### 打刻のステートマシン
 
 `lib/utils.ts` の `ACTION_FLOW` で定義。最後の打刻アクションから次に可能なアクションが決まる:
 
 ```
 none → clock_in
-clock_in → break_start | go_out | clock_out
+clock_in → break_start | go_out | night_duty_start | clock_out
 break_start → break_end
-break_end → break_start | go_out | clock_out
+break_end → break_start | go_out | night_duty_start | clock_out
 go_out → return
-return → break_start | go_out | clock_out
+return → break_start | go_out | night_duty_start | clock_out
+night_duty_start → night_duty_end
+night_duty_end → break_start | go_out | night_duty_start | clock_out
 clock_out → clock_in  （複数セッション対応）
 ```
 
@@ -93,14 +107,22 @@ clock_out → clock_in  （複数セッション対応）
 `lib/utils.ts` の `calculateWorkHours(records)`:
 - `clock_in → clock_out` の差分を合計
 - `break_start → break_end` と `go_out → return` の時間を差し引く
+- `night_duty_start` / `night_duty_end` は時間計算に影響しない（マーカーのみ）
 - 戻り値: 時間単位（小数点1桁）
+- 退勤レコードがない日は勤務時間0として集計される
+
+### Excelエクスポート
+
+`/api/admin/export?month=YYYY-MM` が `.xlsx` を返す（`xlsx` ライブラリ使用）:
+- 職員ごとに1シート（シート名 = 職員名）
+- A列: 日付、以降: 出勤・退勤・休憩開始・休憩終了・外出・帰院・夜間当番開始・夜間当番終了
 
 ## UIデザイン方針
 
 - スタイル: Material Design 3 ベース、ミニマル・クリニカル（医療系）
 - カラー: ホワイト背景、アクセントにティールグリーン（#009688）をMD3 primaryとして使用
 - フォント: 日本語は Noto Sans JP、英数字は DM Sans
-- アニメーション: Framer Motion、控えめなフェードスライド中心
+- アニメーション: Framer Motion（`components/PunchFlow.tsx` / `app/admin/**`）、控えめなフェードスライド中心
 - **絶対に使わないもの**: 汎用的な紫グラデーション、Inter / Arial
 
 ## UIコーディングルール
@@ -116,6 +138,7 @@ MD3トークン（--md-sys-color-*）
 ```
 
 - **MD3カラーロール**を使うこと: `bg-md-surface`, `text-md-on-surface-variant`, `bg-md-primary-container` など
+- 夜間当番用に `bg-md-night-container` / `text-md-on-night-container`（ネイビー系）を定義済み
 - `bg-[#009688]` のような直書きは違反
 - 状態レイヤーは `var(--md-state-primary-hover)` / `var(--md-state-primary-focus)` を使う
 
@@ -153,8 +176,9 @@ MD3トークン（--md-sys-color-*）
 `supabase/schema.sql` に定義。テーブル:
 - `staff`: 職員マスタ（id, name, display_order）
 - `attendance_records`: 打刻記録（staff_id, action, timestamp, work_date, note）
+- `staff_memos`: 連絡メモ（staff_id, memo_date, content）
 
-`action` の値: `clock_in` / `clock_out` / `break_start` / `break_end` / `go_out` / `return`
+`action` の値: `clock_in` / `clock_out` / `break_start` / `break_end` / `go_out` / `return` / `night_duty_start` / `night_duty_end`
 
 ## デプロイ
 

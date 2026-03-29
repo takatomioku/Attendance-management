@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Check, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Check, AlertCircle, FileText } from 'lucide-react';
 import { Staff, ActionType } from '@/types';
 import {
   ACTION_LABELS,
@@ -10,20 +10,28 @@ import {
   cn,
   formatLiveClock,
   formatDateJP,
+  getJSTDateString,
 } from '@/lib/utils';
 
-type Step = 'select_name' | 'select_action' | 'confirm' | 'success';
+type Step =
+  | 'select_name'
+  | 'select_action'
+  | 'confirm'
+  | 'success'
+  | 'memo_name'
+  | 'memo_input'
+  | 'memo_success';
 
 // MD3 Filled Tonal Button styles per action
 const ACTION_STYLES: Record<ActionType, string> = {
-  clock_in:    'bg-primary text-white hover:shadow-md-2',
-  clock_out:   'bg-md-surface-container-high text-md-on-surface hover:shadow-md-1',
-  break_start: 'bg-md-warning-container text-md-on-warning-container hover:shadow-md-1',
-  break_end:   'bg-md-warning-container text-md-on-warning-container hover:shadow-md-1',
-  go_out:            'bg-md-secondary-container text-md-on-secondary-container hover:shadow-md-1',
-  return:            'bg-md-secondary-container text-md-on-secondary-container hover:shadow-md-1',
-  night_duty_start:  'bg-md-night-container text-md-on-night-container hover:shadow-md-1',
-  night_duty_end:    'bg-md-night-container text-md-on-night-container hover:shadow-md-1',
+  clock_in:         'bg-primary text-white hover:shadow-md-2',
+  clock_out:        'bg-md-surface-container-high text-md-on-surface hover:shadow-md-1',
+  break_start:      'bg-md-warning-container text-md-on-warning-container hover:shadow-md-1',
+  break_end:        'bg-md-warning-container text-md-on-warning-container hover:shadow-md-1',
+  go_out:           'bg-md-secondary-container text-md-on-secondary-container hover:shadow-md-1',
+  return:           'bg-md-secondary-container text-md-on-secondary-container hover:shadow-md-1',
+  night_duty_start: 'bg-md-night-container text-md-on-night-container hover:shadow-md-1',
+  night_duty_end:   'bg-md-night-container text-md-on-night-container hover:shadow-md-1',
 };
 
 const fadeSlide = {
@@ -47,6 +55,10 @@ export function PunchFlow({
   const [now, setNow] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Memo states
+  const [memoStaff, setMemoStaff] = useState<Staff | null>(null);
+  const [memoDate, setMemoDate] = useState('');
+  const [memoContent, setMemoContent] = useState('');
 
   useEffect(() => {
     setNow(new Date());
@@ -55,14 +67,24 @@ export function PunchFlow({
   }, []);
 
   useEffect(() => {
-    if (step !== 'success') return;
+    if (step !== 'success' && step !== 'memo_success') return;
     const id = setTimeout(() => {
       setStep('select_name');
       setSelectedStaff(null);
       setSelectedAction(null);
+      setMemoStaff(null);
+      setMemoContent('');
       setError(null);
     }, 3000);
     return () => clearTimeout(id);
+  }, [step]);
+
+  // Reset memo fields when entering memo_name
+  useEffect(() => {
+    if (step !== 'memo_name') return;
+    setMemoDate(getJSTDateString());
+    setMemoContent('');
+    setMemoStaff(null);
   }, [step]);
 
   const handleSelectName = useCallback((staff: Staff) => {
@@ -90,6 +112,51 @@ export function PunchFlow({
       setLoading(false);
     }
   }, [selectedStaff, selectedAction]);
+
+  const handleMemoSubmit = useCallback(async () => {
+    if (!memoStaff || !memoDate || !memoContent.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/memos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          staff_id: memoStaff.id,
+          memo_date: memoDate,
+          content: memoContent.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setStep('memo_success');
+    } catch {
+      setError('メモの送信に失敗しました。もう一度お試しください。');
+    } finally {
+      setLoading(false);
+    }
+  }, [memoStaff, memoDate, memoContent]);
+
+  const staffGrid = (onSelect: (s: Staff) => void) => (
+    <div className="grid grid-cols-2 gap-3">
+      {staffList.map((staff) => (
+        <button
+          key={staff.id}
+          onClick={() => onSelect(staff)}
+          disabled={loading}
+          className={cn(
+            'py-6 px-3 rounded-md-lg border border-md-outline-variant bg-md-surface',
+            'text-md-on-surface font-medium text-base',
+            'transition-all duration-md-s4 ease-md-standard active:scale-[0.97]',
+            'hover:border-primary hover:bg-[var(--md-state-primary-hover)] hover:text-primary',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+            loading && 'opacity-40 pointer-events-none'
+          )}
+        >
+          {staff.name}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-md-surface flex flex-col">
@@ -120,24 +187,15 @@ export function PunchFlow({
                     {error}
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-3">
-                  {staffList.map((staff) => (
-                    <button
-                      key={staff.id}
-                      onClick={() => handleSelectName(staff)}
-                      disabled={loading}
-                      className={cn(
-                        'py-6 px-3 rounded-md-lg border border-md-outline-variant bg-md-surface',
-                        'text-md-on-surface font-medium text-base',
-                        'transition-all duration-md-s4 ease-md-standard active:scale-[0.97]',
-                        'hover:border-primary hover:bg-[var(--md-state-primary-hover)] hover:text-primary',
-                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                        loading && 'opacity-40 pointer-events-none'
-                      )}
-                    >
-                      {staff.name}
-                    </button>
-                  ))}
+                {staffGrid(handleSelectName)}
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={() => { setError(null); setStep('memo_name'); }}
+                    className="inline-flex items-center gap-1.5 text-sm text-md-on-surface-variant hover:text-primary transition-colors duration-md-s4"
+                  >
+                    <FileText className="w-4 h-4" />
+                    連絡メモを入力する
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -261,6 +319,116 @@ export function PunchFlow({
                   {selectedAction ? ACTION_LABELS[selectedAction] : ''}
                 </p>
                 <p className="text-md-on-surface-variant text-lg">{selectedStaff?.name}</p>
+                <p className="text-md-on-surface-variant/50 text-sm mt-6">3秒後に戻ります</p>
+              </motion.div>
+            )}
+
+            {/* Memo Step 1: name selection */}
+            {step === 'memo_name' && (
+              <motion.div key="memo_name" {...fadeSlide}>
+                <button
+                  onClick={() => { setStep('select_name'); setError(null); }}
+                  className="flex items-center text-md-on-surface-variant hover:text-md-on-surface mb-6 text-sm transition-colors duration-md-s4"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  戻る
+                </button>
+                <div className="flex items-center justify-center gap-2 mb-6">
+                  <FileText className="w-4 h-4 text-primary" />
+                  <p className="text-sm font-medium text-md-on-surface-variant tracking-wide">
+                    名前を選んでください
+                  </p>
+                </div>
+                {staffGrid((staff) => {
+                  setMemoStaff(staff);
+                  setStep('memo_input');
+                })}
+              </motion.div>
+            )}
+
+            {/* Memo Step 2: date + content input */}
+            {step === 'memo_input' && (
+              <motion.div key="memo_input" {...fadeSlide}>
+                <button
+                  onClick={() => { setStep('memo_name'); setError(null); }}
+                  className="flex items-center text-md-on-surface-variant hover:text-md-on-surface mb-6 text-sm transition-colors duration-md-s4"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  戻る
+                </button>
+                <p className="text-center text-primary font-semibold mb-1">
+                  {memoStaff?.name}
+                </p>
+                <div className="flex items-center justify-center gap-2 mb-6">
+                  <FileText className="w-4 h-4 text-md-on-surface-variant" />
+                  <p className="text-sm font-medium text-md-on-surface-variant tracking-wide">連絡メモ</p>
+                </div>
+
+                <div className="bg-md-surface rounded-md-xl shadow-md-1 p-6 mb-6 space-y-4">
+                  <div>
+                    <label className="text-xs text-md-on-surface-variant block mb-1.5">日付</label>
+                    <input
+                      type="date"
+                      value={memoDate}
+                      onChange={(e) => setMemoDate(e.target.value)}
+                      className="w-full border border-md-outline-variant rounded-md-md px-3 py-2 text-sm text-md-on-surface bg-md-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-dm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-md-on-surface-variant block mb-1.5">内容</label>
+                    <textarea
+                      value={memoContent}
+                      onChange={(e) => setMemoContent(e.target.value)}
+                      placeholder="連絡事項を入力してください"
+                      rows={4}
+                      className="w-full border border-md-outline-variant rounded-md-md px-3 py-2 text-sm text-md-on-surface bg-md-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none"
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 text-md-on-error-container text-sm bg-md-error-container rounded-md-md p-3 mb-4">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleMemoSubmit}
+                  disabled={loading || !memoContent.trim()}
+                  className={cn(
+                    'w-full py-4 rounded-md-full bg-primary text-white font-medium text-base tracking-wide',
+                    'hover:shadow-md-2 transition-[box-shadow,background-color] duration-md-s4 ease-md-standard',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                    'active:bg-primary-dark active:scale-[0.98]',
+                    (loading || !memoContent.trim()) && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  {loading ? '送信中…' : '送信する'}
+                </button>
+              </motion.div>
+            )}
+
+            {/* Memo success */}
+            {step === 'memo_success' && (
+              <motion.div
+                key="memo_success"
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25, type: 'spring', stiffness: 180 }}
+                className="text-center py-10"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.08, type: 'spring', stiffness: 220 }}
+                  className="w-24 h-24 bg-md-primary-container rounded-full flex items-center justify-center mx-auto mb-6 shadow-md-2"
+                >
+                  <Check className="w-12 h-12 text-md-on-primary-container stroke-[2.5]" />
+                </motion.div>
+                <p className="text-3xl font-bold text-md-on-surface mb-2">送信しました</p>
+                <p className="text-md-on-surface-variant text-lg">{memoStaff?.name}</p>
                 <p className="text-md-on-surface-variant/50 text-sm mt-6">3秒後に戻ります</p>
               </motion.div>
             )}

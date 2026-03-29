@@ -32,6 +32,14 @@ export interface AttendanceRecord {
   staff?: Staff;
 }
 
+export interface StaffMemo {
+  id: string;
+  staff_id: string;
+  memo_date: string;
+  content: string;
+  created_at: string;
+}
+
 export interface DailyStaffStatus {
   staff: Staff;
   status: AttendanceStatus;
