@@ -19,6 +19,8 @@ export function DashboardRefresher() {
   };
 
   useEffect(() => {
+    // ページ表示時に即時更新（Router Cacheで古いデータが表示される場合の対策）
+    refresh();
     const id = setInterval(refresh, INTERVAL_SEC * 1000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
