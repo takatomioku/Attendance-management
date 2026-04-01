@@ -73,11 +73,24 @@ rm -rf .next node_modules && npm install
 - `middleware.ts` が `/admin/*` を保護（`/admin/login` は除外）
 - 職員の打刻画面（`/`）は認証なし
 
-### 打刻画面のデータ取得
+### 打刻画面のデータ取得とステータス管理
 
 `app/page.tsx`（Server Component）がページ読み込み時に職員一覧と当日の全打刻記録を `Promise.all` で並列取得し、`initialStatuses: Record<string, ActionType | null>` として `PunchFlow` へ渡す。
 
-これにより職員名タップ時の `/api/attendance/status` 呼び出しは不要になっている（`PunchFlow.tsx` の `handleSelectName` は同期処理）。
+`PunchFlow.tsx` はこれを `currentStatuses` ローカル状態に持ち、打刻成功のたびに該当職員のステータスを更新する。これによりページ再読み込みなしでも、連続打刻時に正しい次のアクションが表示される。`/api/attendance/status` はルートとして存在するが打刻画面からは呼ばれない。
+
+### PunchFlow のステップ遷移
+
+`components/PunchFlow.tsx` は打刻フローと連絡メモフローの2系統を持つ：
+
+```
+【打刻】 select_name → select_action → confirm → success → (3秒後) select_name
+【メモ】 select_name → memo_name → memo_input → memo_success → (3秒後) select_name
+```
+
+- `currentStatuses`（ローカル状態）で職員ごとの最新アクションを管理
+- 打刻成功時に `setCurrentStatuses` で該当職員のステータスを即時更新
+- メモ送信は `POST /api/memos`
 
 ### 打刻のステートマシン
 
@@ -115,7 +128,7 @@ clock_out → clock_in  （複数セッション対応）
 
 `/api/admin/export?month=YYYY-MM` が `.xlsx` を返す（`xlsx` ライブラリ使用）:
 - 職員ごとに1シート（シート名 = 職員名）
-- A列: 日付、以降: 出勤・退勤・休憩開始・休憩終了・外出・帰院・夜間当番開始・夜間当番終了
+- A列: 日付、B〜I列: 出勤・退勤・休憩開始・休憩終了・外出・帰院・夜間当番開始・夜間当番終了、**J列: 連絡メモ**（同日の `staff_memos` を「、」で結合）
 
 ## UIデザイン方針
 

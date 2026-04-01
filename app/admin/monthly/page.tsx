@@ -58,9 +58,14 @@ export default function MonthlyPage() {
         fetch(`/api/admin/records?month=${ym}`),
         fetch(`/api/memos?month=${ym}`),
       ]);
-      setStaffList(await staffRes.json());
-      setRecords(await recRes.json());
-      setMemos(await memosRes.json());
+      const [staffData, recData, memosData] = await Promise.all([
+        staffRes.json(),
+        recRes.json(),
+        memosRes.json(),
+      ]);
+      setStaffList(Array.isArray(staffData) ? staffData : []);
+      setRecords(Array.isArray(recData) ? recData : []);
+      setMemos(Array.isArray(memosData) ? memosData : []);
     } finally {
       setLoading(false);
     }
