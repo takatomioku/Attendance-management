@@ -9,6 +9,7 @@ import {
   formatTime,
 } from '@/lib/utils';
 import { Staff, AttendanceRecord, ActionType, AttendanceStatus } from '@/types';
+import { DashboardRefresher } from '@/components/admin/DashboardRefresher';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,9 +52,12 @@ export default async function AdminDashboard() {
   return (
     <div>
       {/* Page header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-md-on-surface tracking-tight">ダッシュボード</h1>
-        <p className="text-sm text-md-on-surface-variant mt-1">{today}（当日）</p>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-semibold text-md-on-surface tracking-tight">ダッシュボード</h1>
+          <p className="text-sm text-md-on-surface-variant mt-1">{today}（当日）</p>
+        </div>
+        <DashboardRefresher />
       </div>
 
       {/* MD3 Warning banner */}
