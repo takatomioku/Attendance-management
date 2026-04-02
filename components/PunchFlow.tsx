@@ -621,7 +621,7 @@ export function PunchFlow({
                           const hours = calculateWorkHours(recs);
                           const missedPunch = recs.some((r) => r.action === 'clock_in') && !recs.some((r) => r.action === 'clock_out');
                           return (
-                            <div key={date} className="bg-md-surface rounded-md-xl shadow-md-1 px-4 py-3">
+                            <div key={date} className="bg-md-surface-container rounded-md-xl px-4 py-3 border border-md-outline-variant/30">
                               {/* Date row */}
                               <div className="flex items-center justify-between mb-2.5">
                                 <span className="text-sm font-semibold text-md-on-surface font-dm">
