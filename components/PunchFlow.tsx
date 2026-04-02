@@ -228,21 +228,42 @@ export function PunchFlow({
                   </div>
                 )}
                 {staffGrid(handleSelectName)}
-                <div className="mt-8 flex justify-center gap-6">
+                <div className="mt-6 grid grid-cols-3 gap-2">
                   <button
                     onClick={() => { setError(null); setStep('memo_name'); }}
-                    className="inline-flex items-center gap-1.5 text-sm text-md-on-surface-variant hover:text-primary transition-colors duration-md-s4"
+                    className={cn(
+                      'flex flex-col items-center gap-1.5 py-3 px-2 rounded-md-lg',
+                      'bg-md-warning-container text-md-on-warning-container text-xs font-medium',
+                      'hover:shadow-md-1 transition-[box-shadow] duration-md-s4 active:scale-[0.97]'
+                    )}
                   >
                     <FileText className="w-4 h-4" />
                     連絡メモを入力する
                   </button>
                   <button
                     onClick={() => { setError(null); setTimecardMonth(getCurrentYearMonth()); setStep('timecard_name'); }}
-                    className="inline-flex items-center gap-1.5 text-sm text-md-on-surface-variant hover:text-primary transition-colors duration-md-s4"
+                    className={cn(
+                      'flex flex-col items-center gap-1.5 py-3 px-2 rounded-md-lg',
+                      'bg-md-night-container text-md-on-night-container text-xs font-medium',
+                      'hover:shadow-md-1 transition-[box-shadow] duration-md-s4 active:scale-[0.97]'
+                    )}
                   >
                     <Clock className="w-4 h-4" />
                     タイムカードを確認する
                   </button>
+                  <a
+                    href="/admin"
+                    className={cn(
+                      'flex flex-col items-center gap-1.5 py-3 px-2 rounded-md-lg',
+                      'bg-md-surface-container text-md-on-surface-variant text-xs font-medium',
+                      'hover:shadow-md-1 transition-[box-shadow] duration-md-s4 active:scale-[0.97]'
+                    )}
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                    </svg>
+                    管理画面
+                  </a>
                 </div>
               </motion.div>
             )}
@@ -589,15 +610,7 @@ export function PunchFlow({
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="text-center py-6">
-        <a
-          href="/admin"
-          className="text-xs text-md-on-surface-variant/40 hover:text-md-on-surface-variant transition-colors duration-md-s4"
-        >
-          管理者画面
-        </a>
-      </div>
+      <div className="py-6" />
     </div>
   );
 }
