@@ -215,9 +215,12 @@ export function PunchFlow({
             {/* Step 1: Staff selection — MD3 Outlined Cards */}
             {step === 'select_name' && (
               <motion.div key="name" {...fadeSlide}>
-                <p className="text-sm font-medium text-md-on-surface-variant text-center mb-6 tracking-wide">
-                  名前を選んでください
-                </p>
+                <div className="flex flex-col items-center mb-6 gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md-full bg-primary text-white text-sm font-medium">
+                    打刻
+                  </span>
+                  <p className="text-sm text-md-on-surface-variant tracking-wide">名前を選んでください</p>
+                </div>
                 {error && (
                   <div className="flex items-center gap-2 text-md-on-error-container text-sm bg-md-error-container rounded-md-md p-3 mb-4">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -377,11 +380,12 @@ export function PunchFlow({
                   <ChevronLeft className="w-4 h-4" />
                   戻る
                 </button>
-                <div className="flex items-center justify-center gap-2 mb-6">
-                  <FileText className="w-4 h-4 text-primary" />
-                  <p className="text-sm font-medium text-md-on-surface-variant tracking-wide">
-                    名前を選んでください
-                  </p>
+                <div className="flex flex-col items-center mb-6 gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md-full bg-md-warning-container text-md-on-warning-container text-sm font-medium">
+                    <FileText className="w-3.5 h-3.5" />
+                    連絡メモを入力する
+                  </span>
+                  <p className="text-sm text-md-on-surface-variant tracking-wide">名前を選んでください</p>
                 </div>
                 {staffGrid((staff) => {
                   setMemoStaff(staff);
@@ -487,11 +491,12 @@ export function PunchFlow({
                   <ChevronLeft className="w-4 h-4" />
                   戻る
                 </button>
-                <div className="flex items-center justify-center gap-2 mb-6">
-                  <Clock className="w-4 h-4 text-primary" />
-                  <p className="text-sm font-medium text-md-on-surface-variant tracking-wide">
-                    名前を選んでください
-                  </p>
+                <div className="flex flex-col items-center mb-6 gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md-full bg-md-night-container text-md-on-night-container text-sm font-medium">
+                    <Clock className="w-3.5 h-3.5" />
+                    タイムカードを確認する
+                  </span>
+                  <p className="text-sm text-md-on-surface-variant tracking-wide">名前を選んでください</p>
                 </div>
                 {staffGrid((staff) => {
                   setTimecardStaff(staff);
