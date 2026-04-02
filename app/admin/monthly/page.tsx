@@ -174,11 +174,6 @@ export default function MonthlyPage() {
                     <span className="font-dm font-semibold text-primary">{s.totalHours}</span>
                     h
                   </span>
-                  {s.overtimeDays > 0 && (
-                    <span className="text-md-on-warning-container text-xs font-medium bg-md-warning-container px-2.5 py-0.5 rounded-md-full">
-                      残業 {s.overtimeDays}日
-                    </span>
-                  )}
                   <ChevronRight
                     className={`w-4 h-4 text-md-on-surface-variant transition-transform duration-md-s4 ${
                       expandedStaff === s.staff.id ? 'rotate-90' : ''
@@ -238,11 +233,8 @@ export default function MonthlyPage() {
                                 </div>
                               </td>
                               <td className="px-6 py-2.5 text-xs">
-                                {d.isOvertime && (
-                                  <span className="text-md-on-warning-container">残業</span>
-                                )}
                                 {d.hasMissedPunch && (
-                                  <span className="text-md-on-error-container ml-1">退勤未打刻</span>
+                                  <span className="text-md-on-error-container">退勤未打刻</span>
                                 )}
                               </td>
                               <td className="px-6 py-2.5 text-xs text-md-on-surface-variant max-w-xs">
