@@ -613,7 +613,7 @@ export function PunchFlow({
                       </div>
 
                       {/* Day cards */}
-                      <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-0.5">
+                      <div className="space-y-2 max-h-[45vh] overflow-y-auto px-0.5 pb-2">
                         {sortedDates.map((date) => {
                           const recs = byDate[date].slice().sort(
                             (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
