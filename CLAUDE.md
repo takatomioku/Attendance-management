@@ -40,8 +40,8 @@ rm -rf .next node_modules && npm install
 | ルート | メソッド | 用途 |
 |--------|---------|------|
 | `/api/staff` | GET | 職員一覧取得 |
-| `/api/attendance` | GET / POST | 打刻送信・当日履歴取得 |
-| `/api/attendance/status` | GET | 職員の最終打刻状態取得（単件） |
+| `/api/attendance` | POST | 打刻送信 |
+| `/api/attendance/status` | GET | 職員の最終打刻状態取得（単件、現在未使用） |
 | `/api/admin/records` | GET / POST | 管理者用打刻記録の取得・追加 |
 | `/api/admin/records/[id]` | PUT / DELETE | 個別レコードの編集・削除 |
 | `/api/admin/export` | GET | Excelエクスポート（職員別シート、J列に連絡メモ） |
@@ -57,7 +57,7 @@ rm -rf .next node_modules && npm install
 | `/admin/edit` | 打刻修正（レコードの追加・編集・削除） |
 | `/admin/settings` | 設定（古いデータの一括削除） |
 
-`app/admin/layout.tsx` が管理者共通レイアウト（ログアウトボタン等）を提供。`components/admin/LogoutButton.tsx` がログアウト処理を担当。
+`app/admin/layout.tsx` が管理者共通レイアウト（ナビゲーション・ログアウトボタン）を提供。
 
 ### Supabaseクライアントの使い分け
 
@@ -66,6 +66,8 @@ rm -rf .next node_modules && npm install
 | `createServiceClient()` | `lib/supabase/server.ts` | APIルート・Server Componentsでのデータ操作（RLSをバイパス） |
 | `createSessionClient()` | `lib/supabase/server.ts` | ミドルウェアでの認証チェック |
 | `createClient()` | `lib/supabase/client.ts` | ブラウザ側のSupabase Auth（ログイン/ログアウトのみ） |
+
+**重要:** `createServiceClient()` は内部で `cache: 'no-store'` を指定したカスタム fetch を使う。Next.js 14 が Server Component 内の fetch を自動キャッシュするため、これを外すとダッシュボードが古いデータを返し続ける。
 
 ### 認証
 
@@ -107,6 +109,13 @@ night_duty_start → night_duty_end
 night_duty_end → break_start | go_out | night_duty_start | clock_out
 clock_out → clock_in  （複数セッション対応）
 ```
+
+### ダッシュボードのリアルタイム更新
+
+`app/admin/page.tsx` は `export const dynamic = 'force-dynamic'` を設定したServer Component。ただしNext.js 14のクライアントサイドRouter Cacheにより、ナビゲーション時に30秒間古いデータが返る問題があるため：
+
+- `next.config.js` で `experimental.staleTimes.dynamic = 0` を設定（Router Cache無効化）
+- `components/admin/DashboardRefresher.tsx`（Client Component）がマウント時と30秒ごとに `router.refresh()` を呼ぶ
 
 ### タイムゾーン
 
@@ -173,6 +182,15 @@ MD3トークン（--md-sys-color-*）
 ### Hydrationエラー防止
 
 リアルタイム時計など「サーバーとクライアントで値が変わる要素」は `useState(null)` で初期化し、`useEffect` 内でセット。
+
+### Client ComponentでのAPIレスポンス処理
+
+APIがエラーを返した場合 `{ error: "..." }` が返り、それを配列として扱おうとすると `.filter()` 等でクラッシュする。`fetch` 後は必ず `Array.isArray()` でガードする:
+
+```ts
+const data = await res.json();
+setState(Array.isArray(data) ? data : []);
+```
 
 ## 環境変数（.env.local）
 

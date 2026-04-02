@@ -15,9 +15,13 @@ export async function GET(request: NextRequest) {
     .order('timestamp', { ascending: true });
 
   if (month) {
+    const [y, mo] = month.split('-').map(Number);
+    const nextMonth = mo === 12
+      ? `${y + 1}-01-01`
+      : `${y}-${String(mo + 1).padStart(2, '0')}-01`;
     query = query
       .gte('work_date', `${month}-01`)
-      .lte('work_date', `${month}-31`);
+      .lt('work_date', nextMonth);
   } else {
     query = query.eq('work_date', date ?? getJSTDateString());
   }
