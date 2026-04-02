@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Check, AlertCircle, FileText } from 'lucide-react';
-import { Staff, ActionType } from '@/types';
+import { ChevronLeft, ChevronRight, Check, AlertCircle, FileText, Clock } from 'lucide-react';
+import { Staff, ActionType, AttendanceRecord } from '@/types';
 import {
   ACTION_LABELS,
   getAvailableActions,
   cn,
   formatLiveClock,
   formatDateJP,
+  formatTime,
   getJSTDateString,
+  calculateWorkHours,
 } from '@/lib/utils';
 
 type Step =
@@ -20,7 +22,20 @@ type Step =
   | 'success'
   | 'memo_name'
   | 'memo_input'
-  | 'memo_success';
+  | 'memo_success'
+  | 'timecard_name'
+  | 'timecard_view';
+
+function getCurrentYearMonth(): string {
+  const jst = new Date(Date.now() + 9 * 3600000);
+  return jst.toISOString().slice(0, 7);
+}
+
+function shiftMonth(ym: string, delta: number): string {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
 
 // MD3 Filled Tonal Button styles per action
 const ACTION_STYLES: Record<ActionType, string> = {
@@ -61,6 +76,11 @@ export function PunchFlow({
   const [memoStaff, setMemoStaff] = useState<Staff | null>(null);
   const [memoDate, setMemoDate] = useState('');
   const [memoContent, setMemoContent] = useState('');
+  // Timecard states
+  const [timecardStaff, setTimecardStaff] = useState<Staff | null>(null);
+  const [timecardMonth, setTimecardMonth] = useState(getCurrentYearMonth);
+  const [timecardRecords, setTimecardRecords] = useState<AttendanceRecord[]>([]);
+  const [timecardLoading, setTimecardLoading] = useState(false);
 
   useEffect(() => {
     setNow(new Date());
@@ -88,6 +108,19 @@ export function PunchFlow({
     setMemoContent('');
     setMemoStaff(null);
   }, [step]);
+
+  // Fetch timecard records when staff or month changes
+  useEffect(() => {
+    if (step !== 'timecard_view' || !timecardStaff) return;
+    setTimecardLoading(true);
+    fetch(`/api/admin/records?month=${timecardMonth}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const arr = Array.isArray(data) ? data : [];
+        setTimecardRecords(arr.filter((r: AttendanceRecord) => r.staff_id === timecardStaff.id));
+      })
+      .finally(() => setTimecardLoading(false));
+  }, [step, timecardStaff, timecardMonth]);
 
   const handleSelectName = useCallback((staff: Staff) => {
     const lastAction = currentStatuses[staff.id] ?? null;
@@ -192,13 +225,20 @@ export function PunchFlow({
                   </div>
                 )}
                 {staffGrid(handleSelectName)}
-                <div className="mt-8 text-center">
+                <div className="mt-8 flex justify-center gap-6">
                   <button
                     onClick={() => { setError(null); setStep('memo_name'); }}
                     className="inline-flex items-center gap-1.5 text-sm text-md-on-surface-variant hover:text-primary transition-colors duration-md-s4"
                   >
                     <FileText className="w-4 h-4" />
                     連絡メモを入力する
+                  </button>
+                  <button
+                    onClick={() => { setError(null); setTimecardMonth(getCurrentYearMonth()); setStep('timecard_name'); }}
+                    className="inline-flex items-center gap-1.5 text-sm text-md-on-surface-variant hover:text-primary transition-colors duration-md-s4"
+                  >
+                    <Clock className="w-4 h-4" />
+                    タイムカードを確認する
                   </button>
                 </div>
               </motion.div>
@@ -434,6 +474,109 @@ export function PunchFlow({
                 <p className="text-3xl font-bold text-md-on-surface mb-2">送信しました</p>
                 <p className="text-md-on-surface-variant text-lg">{memoStaff?.name}</p>
                 <p className="text-md-on-surface-variant/50 text-sm mt-6">3秒後に戻ります</p>
+              </motion.div>
+            )}
+
+            {/* Timecard Step 1: name selection */}
+            {step === 'timecard_name' && (
+              <motion.div key="timecard_name" {...fadeSlide}>
+                <button
+                  onClick={() => { setStep('select_name'); setError(null); }}
+                  className="flex items-center text-md-on-surface-variant hover:text-md-on-surface mb-6 text-sm transition-colors duration-md-s4"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  戻る
+                </button>
+                <div className="flex items-center justify-center gap-2 mb-6">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <p className="text-sm font-medium text-md-on-surface-variant tracking-wide">
+                    名前を選んでください
+                  </p>
+                </div>
+                {staffGrid((staff) => {
+                  setTimecardStaff(staff);
+                  setStep('timecard_view');
+                })}
+              </motion.div>
+            )}
+
+            {/* Timecard Step 2: monthly view */}
+            {step === 'timecard_view' && timecardStaff && (
+              <motion.div key="timecard_view" {...fadeSlide}>
+                <button
+                  onClick={() => { setStep('timecard_name'); setError(null); }}
+                  className="flex items-center text-md-on-surface-variant hover:text-md-on-surface mb-4 text-sm transition-colors duration-md-s4"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  戻る
+                </button>
+                <p className="text-center text-primary font-semibold mb-4">{timecardStaff.name}</p>
+
+                {/* Month navigator */}
+                <div className="flex items-center justify-center gap-4 mb-4">
+                  <button
+                    onClick={() => setTimecardMonth((m) => shiftMonth(m, -1))}
+                    className="p-1.5 rounded-md-full hover:bg-[var(--md-state-primary-hover)] transition-colors"
+                  >
+                    <ChevronLeft className="w-4 h-4 text-md-on-surface-variant" />
+                  </button>
+                  <span className="text-sm font-semibold text-md-on-surface font-dm min-w-[6rem] text-center">
+                    {timecardMonth.replace('-', '年')}月
+                  </span>
+                  <button
+                    onClick={() => setTimecardMonth((m) => shiftMonth(m, 1))}
+                    className="p-1.5 rounded-md-full hover:bg-[var(--md-state-primary-hover)] transition-colors"
+                  >
+                    <ChevronRight className="w-4 h-4 text-md-on-surface-variant" />
+                  </button>
+                </div>
+
+                {timecardLoading ? (
+                  <div className="text-center py-10 text-md-on-surface-variant text-sm">読み込み中…</div>
+                ) : timecardRecords.length === 0 ? (
+                  <div className="text-center py-10 text-md-on-surface-variant/50 text-sm">記録なし</div>
+                ) : (
+                  <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
+                    {Object.entries(
+                      timecardRecords.reduce<Record<string, AttendanceRecord[]>>((acc, r) => {
+                        (acc[r.work_date] = acc[r.work_date] ?? []).push(r);
+                        return acc;
+                      }, {})
+                    )
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([date, recs]) => {
+                        const hours = calculateWorkHours(recs);
+                        return (
+                          <div key={date} className="bg-md-surface rounded-md-lg shadow-md-1 px-4 py-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-md-on-surface font-dm">
+                                {date.slice(5).replace('-', '/')}
+                              </span>
+                              {hours > 0 && (
+                                <span className="text-xs font-dm font-semibold text-primary">{hours}h</span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {recs
+                                .slice()
+                                .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                                .map((r) => (
+                                  <span
+                                    key={r.id}
+                                    className="text-xs bg-md-surface-container text-md-on-surface-variant px-2 py-0.5 rounded-md-xs font-dm"
+                                  >
+                                    {ACTION_LABELS[r.action]} {formatTime(r.timestamp)}
+                                  </span>
+                                ))}
+                            </div>
+                            {recs.some((r) => r.action === 'clock_in') && !recs.some((r) => r.action === 'clock_out') && (
+                              <p className="text-xs text-md-on-error-container mt-1.5">退勤未打刻</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </motion.div>
             )}
 
