@@ -37,6 +37,25 @@ function shiftMonth(ym: string, delta: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+// Action chip colors for timecard view
+const ACTION_CHIP_STYLES: Record<ActionType, string> = {
+  clock_in:         'bg-md-primary-container text-md-on-primary-container',
+  clock_out:        'bg-md-surface-container-high text-md-on-surface',
+  break_start:      'bg-md-warning-container text-md-on-warning-container',
+  break_end:        'bg-md-warning-container text-md-on-warning-container',
+  go_out:           'bg-md-secondary-container text-md-on-secondary-container',
+  return:           'bg-md-secondary-container text-md-on-secondary-container',
+  night_duty_start: 'bg-md-night-container text-md-on-night-container',
+  night_duty_end:   'bg-md-night-container text-md-on-night-container',
+};
+
+const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+function dateWithDow(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dow = DOW[new Date(y, m - 1, d).getDay()];
+  return `${String(m).padStart(2, '0')}/${String(d).padStart(2, '0')}（${dow}）`;
+}
+
 // MD3 Filled Tonal Button styles per action
 const ACTION_STYLES: Record<ActionType, string> = {
   clock_in:         'bg-primary text-white hover:shadow-md-2',
@@ -527,84 +546,123 @@ export function PunchFlow({
             )}
 
             {/* Timecard Step 2: monthly view */}
-            {step === 'timecard_view' && timecardStaff && (
-              <motion.div key="timecard_view" {...fadeSlide}>
-                <button
-                  onClick={() => { setStep('timecard_name'); setError(null); }}
-                  className="flex items-center text-md-on-surface-variant hover:text-md-on-surface mb-4 text-sm transition-colors duration-md-s4"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  戻る
-                </button>
-                <p className="text-center text-primary font-semibold mb-4">{timecardStaff.name}</p>
-
-                {/* Month navigator */}
-                <div className="flex items-center justify-center gap-4 mb-4">
+            {step === 'timecard_view' && timecardStaff && (() => {
+              const byDate = timecardRecords.reduce<Record<string, AttendanceRecord[]>>((acc, r) => {
+                (acc[r.work_date] = acc[r.work_date] ?? []).push(r);
+                return acc;
+              }, {});
+              const sortedDates = Object.keys(byDate).sort();
+              const totalHours = Math.round(
+                sortedDates.reduce((sum, d) => sum + calculateWorkHours(byDate[d]), 0) * 10
+              ) / 10;
+              const workDays = sortedDates.filter((d) => calculateWorkHours(byDate[d]) > 0).length;
+              return (
+                <motion.div key="timecard_view" {...fadeSlide}>
                   <button
-                    onClick={() => setTimecardMonth((m) => shiftMonth(m, -1))}
-                    className="p-1.5 rounded-md-full hover:bg-[var(--md-state-primary-hover)] transition-colors"
+                    onClick={() => { setStep('timecard_name'); setError(null); }}
+                    className="flex items-center text-md-on-surface-variant hover:text-md-on-surface mb-4 text-sm transition-colors duration-md-s4"
                   >
-                    <ChevronLeft className="w-4 h-4 text-md-on-surface-variant" />
+                    <ChevronLeft className="w-4 h-4" />
+                    戻る
                   </button>
-                  <span className="text-sm font-semibold text-md-on-surface font-dm min-w-[6rem] text-center">
-                    {timecardMonth.replace('-', '年')}月
-                  </span>
-                  <button
-                    onClick={() => setTimecardMonth((m) => shiftMonth(m, 1))}
-                    className="p-1.5 rounded-md-full hover:bg-[var(--md-state-primary-hover)] transition-colors"
-                  >
-                    <ChevronRight className="w-4 h-4 text-md-on-surface-variant" />
-                  </button>
-                </div>
 
-                {timecardLoading ? (
-                  <div className="text-center py-10 text-md-on-surface-variant text-sm">読み込み中…</div>
-                ) : timecardRecords.length === 0 ? (
-                  <div className="text-center py-10 text-md-on-surface-variant/50 text-sm">記録なし</div>
-                ) : (
-                  <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
-                    {Object.entries(
-                      timecardRecords.reduce<Record<string, AttendanceRecord[]>>((acc, r) => {
-                        (acc[r.work_date] = acc[r.work_date] ?? []).push(r);
-                        return acc;
-                      }, {})
-                    )
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([date, recs]) => {
-                        const hours = calculateWorkHours(recs);
-                        return (
-                          <div key={date} className="bg-md-surface rounded-md-lg shadow-md-1 px-4 py-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-md-on-surface font-dm">
-                                {date.slice(5).replace('-', '/')}
-                              </span>
-                              {hours > 0 && (
-                                <span className="text-xs font-dm font-semibold text-primary">{hours}h</span>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              {recs
-                                .slice()
-                                .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-                                .map((r) => (
+                  {/* Header card: name + month nav */}
+                  <div className="bg-md-surface-container rounded-md-xl px-4 py-4 mb-4 shadow-md-1">
+                    <p className="text-center text-lg font-semibold text-md-on-surface mb-3">
+                      {timecardStaff.name}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => setTimecardMonth((m) => shiftMonth(m, -1))}
+                        className="p-2 rounded-md-full hover:bg-[var(--md-state-primary-hover)] transition-colors"
+                      >
+                        <ChevronLeft className="w-5 h-5 text-md-on-surface-variant" />
+                      </button>
+                      <span className="text-base font-semibold text-md-on-surface font-dm">
+                        {timecardMonth.replace('-', '年')}月
+                      </span>
+                      <button
+                        onClick={() => setTimecardMonth((m) => shiftMonth(m, 1))}
+                        className="p-2 rounded-md-full hover:bg-[var(--md-state-primary-hover)] transition-colors"
+                      >
+                        <ChevronRight className="w-5 h-5 text-md-on-surface-variant" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {timecardLoading ? (
+                    <div className="text-center py-10 text-md-on-surface-variant text-sm">読み込み中…</div>
+                  ) : timecardRecords.length === 0 ? (
+                    <div className="text-center py-10 text-md-on-surface-variant/50 text-sm">記録なし</div>
+                  ) : (
+                    <>
+                      {/* Summary chips */}
+                      <div className="grid grid-cols-2 gap-2 mb-4">
+                        <div className="bg-md-primary-container rounded-md-lg px-4 py-3 text-center">
+                          <p className="text-xs text-md-on-primary-container/70 mb-0.5">出勤日数</p>
+                          <p className="text-2xl font-dm font-bold text-md-on-primary-container leading-none">
+                            {workDays}<span className="text-sm font-normal ml-0.5">日</span>
+                          </p>
+                        </div>
+                        <div className="bg-md-primary-container rounded-md-lg px-4 py-3 text-center">
+                          <p className="text-xs text-md-on-primary-container/70 mb-0.5">合計時間</p>
+                          <p className="text-2xl font-dm font-bold text-md-on-primary-container leading-none">
+                            {totalHours}<span className="text-sm font-normal ml-0.5">h</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Day cards */}
+                      <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-0.5">
+                        {sortedDates.map((date) => {
+                          const recs = byDate[date].slice().sort(
+                            (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+                          );
+                          const hours = calculateWorkHours(recs);
+                          const missedPunch = recs.some((r) => r.action === 'clock_in') && !recs.some((r) => r.action === 'clock_out');
+                          return (
+                            <div key={date} className="bg-md-surface rounded-md-xl shadow-md-1 px-4 py-3">
+                              {/* Date row */}
+                              <div className="flex items-center justify-between mb-2.5">
+                                <span className="text-sm font-semibold text-md-on-surface font-dm">
+                                  {dateWithDow(date)}
+                                </span>
+                                {hours > 0 ? (
+                                  <span className="text-sm font-dm font-bold text-primary">{hours}h</span>
+                                ) : (
+                                  <span className="text-xs text-md-on-surface-variant/40 font-dm">—</span>
+                                )}
+                              </div>
+                              {/* Action chips */}
+                              <div className="flex flex-wrap gap-1.5">
+                                {recs.map((r) => (
                                   <span
                                     key={r.id}
-                                    className="text-xs bg-md-surface-container text-md-on-surface-variant px-2 py-0.5 rounded-md-xs font-dm"
+                                    className={cn(
+                                      'inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md-full font-dm font-medium',
+                                      ACTION_CHIP_STYLES[r.action]
+                                    )}
                                   >
-                                    {ACTION_LABELS[r.action]} {formatTime(r.timestamp)}
+                                    {ACTION_LABELS[r.action]}
+                                    <span className="opacity-80">{formatTime(r.timestamp)}</span>
                                   </span>
                                 ))}
+                              </div>
+                              {missedPunch && (
+                                <p className="text-xs text-md-on-error-container mt-2 flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3" />
+                                  退勤未打刻
+                                </p>
+                              )}
                             </div>
-                            {recs.some((r) => r.action === 'clock_in') && !recs.some((r) => r.action === 'clock_out') && (
-                              <p className="text-xs text-md-on-error-container mt-1.5">退勤未打刻</p>
-                            )}
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </motion.div>
-            )}
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              );
+            })()}
 
           </AnimatePresence>
         </div>
