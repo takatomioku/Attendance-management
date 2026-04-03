@@ -65,7 +65,8 @@ export default function EditPage() {
   const saveEdit = async (id: string) => {
     try {
       // datetime-local の入力を UTC ISO に変換（JST として扱う）
-      const localDt = new Date(editValues.timestamp + ':00');
+      // 'Z' を付けて UTC として解釈させてから 9 時間引く（付けないとブラウザのローカルタイムで解釈され二重変換になる）
+      const localDt = new Date(editValues.timestamp + ':00Z');
       const utcIso = new Date(localDt.getTime() - 9 * 3600000).toISOString();
 
       const res = await fetch(`/api/admin/records/${id}`, {
@@ -104,7 +105,7 @@ export default function EditPage() {
     if (!selectedStaffId || !selectedDate) return;
     try {
       const [hh, mm] = addValues.time.split(':');
-      const dt = new Date(`${selectedDate}T${hh}:${mm}:00`);
+      const dt = new Date(`${selectedDate}T${hh}:${mm}:00Z`);
       const utcIso = new Date(dt.getTime() - 9 * 3600000).toISOString();
 
       const res = await fetch('/api/admin/records', {

@@ -83,16 +83,18 @@ rm -rf .next node_modules && npm install
 
 ### PunchFlow のステップ遷移
 
-`components/PunchFlow.tsx` は打刻フローと連絡メモフローの2系統を持つ：
+`components/PunchFlow.tsx` は打刻・連絡メモ・タイムカード確認の3系統を持つ：
 
 ```
-【打刻】 select_name → select_action → confirm → success → (3秒後) select_name
-【メモ】 select_name → memo_name → memo_input → memo_success → (3秒後) select_name
+【打刻】       select_name → select_action → confirm → success → (3秒後) select_name
+【メモ】       select_name → memo_name → memo_input → memo_success → (3秒後) select_name
+【タイムカード】 select_name → timecard_name → timecard_view（戻るで timecard_name へ）
 ```
 
 - `currentStatuses`（ローカル状態）で職員ごとの最新アクションを管理
 - 打刻成功時に `setCurrentStatuses` で該当職員のステータスを即時更新
 - メモ送信は `POST /api/memos`
+- タイムカード確認は `GET /api/admin/records?month=YYYY-MM` を職員IDでクライアントフィルタ
 
 ### 打刻のステートマシン
 
@@ -132,6 +134,10 @@ clock_out → clock_in  （複数セッション対応）
 - `night_duty_start` / `night_duty_end` は時間計算に影響しない（マーカーのみ）
 - 戻り値: 時間単位（小数点1桁）
 - 退勤レコードがない日は勤務時間0として集計される
+
+### 月次クエリの日付範囲
+
+`/api/admin/records?month=YYYY-MM` は `work_date >= YYYY-MM-01 AND work_date < 翌月-01` で取得する。`lte('work_date', \`${month}-31\`)` は4月など31日未満の月でPostgreSQLエラーになるため使わない。
 
 ### Excelエクスポート
 
