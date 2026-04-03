@@ -223,12 +223,13 @@ export function PunchFlow({
         </p>
         <p className="text-6xl font-light text-md-on-surface font-dm">
           {now
-            ? formatLiveClock(now).split(':').map((seg, i) => (
-                <span key={i}>
-                  {i > 0 && <span className="mx-0.5 opacity-70">:</span>}
-                  <span className="inline-block w-[1.3em] text-center">{seg}</span>
-                </span>
-              ))
+            ? [...formatLiveClock(now)].map((char, i) =>
+                char === ':' ? (
+                  <span key={i} className="mx-1 opacity-60">:</span>
+                ) : (
+                  <span key={i} className="inline-block w-[0.62em] text-center">{char}</span>
+                )
+              )
             : '--:--:--'}
         </p>
       </div>
@@ -363,12 +364,13 @@ export function PunchFlow({
                     <span className="text-md-on-surface-variant text-sm">打刻時刻</span>
                     <span className="font-dm text-md-on-surface text-xl font-medium">
                       {now
-                        ? formatLiveClock(now).split(':').map((seg, i) => (
-                            <span key={i}>
-                              {i > 0 && ':'}
-                              <span className="inline-block w-[1.3em] text-center">{seg}</span>
-                            </span>
-                          ))
+                        ? [...formatLiveClock(now)].map((char, i) =>
+                            char === ':' ? (
+                              <span key={i}>:</span>
+                            ) : (
+                              <span key={i} className="inline-block w-[0.62em] text-center">{char}</span>
+                            )
+                          )
                         : '--:--:--'}
                     </span>
                   </div>
