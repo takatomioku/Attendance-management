@@ -221,8 +221,15 @@ export function PunchFlow({
         <p className="text-sm text-md-on-surface-variant mb-2 font-dm tracking-wide">
           {now ? formatDateJP(now) : ''}
         </p>
-        <p className="text-6xl font-light tracking-[0.1em] text-md-on-surface font-dm tabular-nums">
-          {now ? formatLiveClock(now) : '--:--:--'}
+        <p className="text-6xl font-light text-md-on-surface font-dm">
+          {now
+            ? formatLiveClock(now).split(':').map((seg, i) => (
+                <span key={i}>
+                  {i > 0 && <span className="mx-0.5 opacity-70">:</span>}
+                  <span className="inline-block w-[1.3em] text-center">{seg}</span>
+                </span>
+              ))
+            : '--:--:--'}
         </p>
       </div>
 
@@ -354,8 +361,15 @@ export function PunchFlow({
                   <div className="h-px bg-md-outline-variant" />
                   <div className="flex justify-between items-center">
                     <span className="text-md-on-surface-variant text-sm">打刻時刻</span>
-                    <span className="font-dm text-md-on-surface text-xl font-medium tabular-nums">
-                      {now ? formatLiveClock(now) : '--:--:--'}
+                    <span className="font-dm text-md-on-surface text-xl font-medium">
+                      {now
+                        ? formatLiveClock(now).split(':').map((seg, i) => (
+                            <span key={i}>
+                              {i > 0 && ':'}
+                              <span className="inline-block w-[1.3em] text-center">{seg}</span>
+                            </span>
+                          ))
+                        : '--:--:--'}
                     </span>
                   </div>
                 </div>
