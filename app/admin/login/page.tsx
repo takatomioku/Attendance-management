@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -132,6 +132,20 @@ export default function LoginPage() {
           >
             {loading ? 'ログイン中…' : 'ログイン'}
           </button>
+
+          {/* 打刻画面へ戻る */}
+          <a
+            href="/"
+            className={cn(
+              'flex items-center justify-center gap-2 w-full py-3 rounded-md-full',
+              'border border-md-outline text-md-on-surface-variant text-sm font-medium',
+              'hover:bg-md-surface-container transition-colors duration-md-s4 ease-md-standard',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
+            )}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            打刻画面へ戻る
+          </a>
         </form>
       </motion.div>
     </div>
