@@ -225,9 +225,9 @@ export function PunchFlow({
           {now
             ? [...formatLiveClock(now)].map((char, i) =>
                 char === ':' ? (
-                  <span key={i} className="mx-1 opacity-60">:</span>
+                  <span key={i} style={{ margin: '0 0.1em', opacity: 0.6 }}>:</span>
                 ) : (
-                  <span key={i} className="inline-block w-[0.62em] text-center">{char}</span>
+                  <span key={i} style={{ display: 'inline-block', width: '0.65em', textAlign: 'center' }}>{char}</span>
                 )
               )
             : '--:--:--'}
@@ -368,7 +368,7 @@ export function PunchFlow({
                             char === ':' ? (
                               <span key={i}>:</span>
                             ) : (
-                              <span key={i} className="inline-block w-[0.62em] text-center">{char}</span>
+                              <span key={i} style={{ display: 'inline-block', width: '0.65em', textAlign: 'center' }}>{char}</span>
                             )
                           )
                         : '--:--:--'}
