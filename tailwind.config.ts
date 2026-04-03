@@ -50,9 +50,10 @@ const config: Config = {
         'md-3': 'var(--md-sys-elevation-level3)',
       },
       fontFamily: {
-        sans: ['var(--font-noto)', 'sans-serif'],
-        dm:   ['var(--font-dm)', 'sans-serif'],
-        mono: ['var(--font-dm)', 'monospace'],
+        sans:     ['var(--font-noto)', 'sans-serif'],
+        dm:       ['var(--font-dm)', 'sans-serif'],
+        mono:     ['var(--font-dm)', 'monospace'],
+        'dm-mono': ['var(--font-dm-mono)', 'monospace'],
       },
       transitionTimingFunction: {
         'md-standard':   'var(--md-sys-motion-easing-standard)',

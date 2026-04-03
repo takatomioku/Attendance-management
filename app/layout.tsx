@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Noto_Sans_JP, DM_Sans } from 'next/font/google';
+import { Noto_Sans_JP, DM_Sans, DM_Mono } from 'next/font/google';
 import './globals.css';
 
 const notoSansJP = Noto_Sans_JP({
@@ -16,6 +16,13 @@ const dmSans = DM_Sans({
   display: 'swap',
 });
 
+const dmMono = DM_Mono({
+  subsets: ['latin'],
+  weight: ['300', '400', '500'],
+  variable: '--font-dm-mono',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: '勤怠管理',
   description: '職員勤怠管理システム',
@@ -24,7 +31,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ja" className={`${notoSansJP.variable} ${dmSans.variable}`}>
+    <html lang="ja" className={`${notoSansJP.variable} ${dmSans.variable} ${dmMono.variable}`}>
       <body className="font-sans antialiased">{children}</body>
     </html>
   );
