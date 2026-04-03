@@ -149,7 +149,7 @@ clock_out → clock_in  （複数セッション対応）
 
 - スタイル: Material Design 3 ベース、ミニマル・クリニカル（医療系）
 - カラー: ホワイト背景、アクセントにティールグリーン（#009688）をMD3 primaryとして使用
-- フォント: 日本語は Noto Sans JP、英数字は DM Sans
+- フォント: 日本語は Noto Sans JP、英数字は DM Sans、**時計表示のみ DM Mono**（`font-dm-mono`）
 - アニメーション: Framer Motion（`components/PunchFlow.tsx` / `app/admin/**`）、控えめなフェードスライド中心
 - **絶対に使わないもの**: 汎用的な紫グラデーション、Inter / Arial
 
@@ -228,3 +228,19 @@ setState(Array.isArray(data) ? data : []);
 - Node.js v22 では `next.config.ts` が非対応のため `next.config.js` を使用する
 - `package.json` の依存関係はバージョンを明示（`^` による自動更新防止）
 - `.next/` と `node_modules/` は `.gitignore` で除外済み（大きいバイナリファイルがあるためGitHubの100MB制限に注意）
+
+### TypeScript の落とし穴
+
+**文字列のスプレッド展開は使わない。** `tsconfig.json` に `target` が未指定（ES3相当）のため、`[...someString]` はビルドエラーになる。代わりに `someString.split('')` を使う。
+
+### JST→UTC の時刻変換パターン
+
+`datetime-local` や `time` 入力の値をUTCに変換する際、タイムゾーン接尾辞なしの文字列をブラウザのローカル時間（JST）として解釈させると9時間が二重に引かれてしまう。**必ず `Z` を付けてUTCとして解釈させてから9時間引く：**
+
+```ts
+// datetime-local の値 "2026-04-04T13:00" を UTC ISO に変換
+const utc = new Date(new Date(value + ':00Z').getTime() - 9 * 3600000).toISOString();
+
+// time の値 "13:00" を UTC ISO に変換（日付は別途取得）
+const utc = new Date(new Date(`${date}T${time}:00Z`).getTime() - 9 * 3600000).toISOString();
+```
