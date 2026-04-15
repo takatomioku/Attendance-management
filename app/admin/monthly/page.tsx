@@ -240,7 +240,6 @@ export default function MonthlyPage() {
                       </thead>
                       <tbody className="divide-y divide-md-outline-variant/30">
                         {s.days
-                          .filter((d) => d.records.length > 0 || d.memo || remarksMap[`${s.staff.id}_${d.date}`])
                           .map((d) => {
                             const remarkKey = `${s.staff.id}_${d.date}`;
                             const remark = remarksMap[remarkKey];
@@ -325,13 +324,6 @@ export default function MonthlyPage() {
                               </tr>
                             );
                           })}
-                        {s.days.filter((d) => d.records.length > 0 || d.memo || remarksMap[`${s.staff.id}_${d.date}`]).length === 0 && (
-                          <tr>
-                            <td colSpan={5} className="px-6 py-4 text-center text-md-on-surface-variant/40 text-sm">
-                              記録なし
-                            </td>
-                          </tr>
-                        )}
                       </tbody>
                     </table>
                   </div>
