@@ -11,10 +11,10 @@ const ACTION_COLUMNS: ActionType[] = [
 
 const COLUMN_HEADERS = [
   '日付', '出勤', '退勤', '休憩開始', '休憩終了',
-  '外出', '帰院', '夜間当番開始', '夜間当番終了', '連絡メモ',
+  '外出', '帰院', '夜間当番開始', '夜間当番終了', '連絡メモ', '備考',
 ];
 
-const COL_WIDTHS = [12, 8, 8, 10, 10, 8, 8, 14, 14, 40];
+const COL_WIDTHS = [12, 8, 8, 10, 10, 8, 8, 14, 14, 40, 40];
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -23,21 +23,29 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServiceClient();
 
-  const [{ data: staffList }, { data, error }, { data: memosData }] = await Promise.all([
+  const [y, m] = month.split('-').map(Number);
+  const nextMonth = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+
+  const [{ data: staffList }, { data, error }, { data: memosData }, { data: remarksData }] = await Promise.all([
     supabase.from('staff').select('*').order('display_order'),
     supabase
       .from('attendance_records')
       .select('*')
       .gte('work_date', `${month}-01`)
-      .lte('work_date', `${month}-31`)
+      .lt('work_date', `${nextMonth}-01`)
       .order('work_date', { ascending: true })
       .order('timestamp', { ascending: true }),
     supabase
       .from('staff_memos')
       .select('*')
       .gte('memo_date', `${month}-01`)
-      .lte('memo_date', `${month}-31`)
+      .lt('memo_date', `${nextMonth}-01`)
       .order('created_at', { ascending: true }),
+    supabase
+      .from('daily_remarks')
+      .select('*')
+      .gte('remark_date', `${month}-01`)
+      .lt('remark_date', `${nextMonth}-01`),
   ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -45,9 +53,9 @@ export async function GET(request: NextRequest) {
   const records = data ?? [];
   const staff = staffList ?? [];
   const memos = memosData ?? [];
+  const remarks = remarksData ?? [];
 
   // 月の全日付を生成
-  const [y, m] = month.split('-').map(Number);
   const lastDay = new Date(y, m, 0).getDate();
   const days = Array.from({ length: lastDay }, (_, i) =>
     `${month}-${String(i + 1).padStart(2, '0')}`
@@ -58,18 +66,21 @@ export async function GET(request: NextRequest) {
   for (const s of staff) {
     const myRecords = records.filter((r: any) => r.staff_id === s.id);
     const myMemos = memos.filter((memo: any) => memo.staff_id === s.id);
+    const myRemarks = remarks.filter((rk: any) => rk.staff_id === s.id);
 
     const sheetData: string[][] = [COLUMN_HEADERS];
 
     for (const date of days) {
       const dayRecs = myRecords.filter((r: any) => r.work_date === date);
       const dayMemos = myMemos.filter((memo: any) => memo.memo_date === date);
+      const dayRemark = myRemarks.find((rk: any) => rk.remark_date === date);
       const row: string[] = [date];
       for (const action of ACTION_COLUMNS) {
         const rec = dayRecs.find((r: any) => r.action === action);
         row.push(rec ? formatTime(rec.timestamp) : '');
       }
       row.push(dayMemos.map((memo: any) => memo.content).join('、'));
+      row.push(dayRemark ? dayRemark.content : '');
       sheetData.push(row);
     }
 

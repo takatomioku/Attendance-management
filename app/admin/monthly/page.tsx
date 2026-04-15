@@ -47,25 +47,37 @@ export default function MonthlyPage() {
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [memos, setMemos] = useState<StaffMemo[]>([]);
+  const [remarksMap, setRemarksMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [expandedStaff, setExpandedStaff] = useState<string | null>(null);
+  const [editingCell, setEditingCell] = useState<{ staffId: string; date: string } | null>(null);
+  const [editingValue, setEditingValue] = useState('');
 
   const fetchData = useCallback(async (ym: string) => {
     setLoading(true);
     try {
-      const [staffRes, recRes, memosRes] = await Promise.all([
+      const [staffRes, recRes, memosRes, remarksRes] = await Promise.all([
         fetch('/api/staff'),
         fetch(`/api/admin/records?month=${ym}`),
         fetch(`/api/memos?month=${ym}`),
+        fetch(`/api/admin/remarks?month=${ym}`),
       ]);
-      const [staffData, recData, memosData] = await Promise.all([
+      const [staffData, recData, memosData, remarksData] = await Promise.all([
         staffRes.json(),
         recRes.json(),
         memosRes.json(),
+        remarksRes.json(),
       ]);
       setStaffList(Array.isArray(staffData) ? staffData : []);
       setRecords(Array.isArray(recData) ? recData : []);
       setMemos(Array.isArray(memosData) ? memosData : []);
+      const map: Record<string, string> = {};
+      if (Array.isArray(remarksData)) {
+        for (const r of remarksData) {
+          map[`${r.staff_id}_${r.remark_date}`] = r.content;
+        }
+      }
+      setRemarksMap(map);
     } finally {
       setLoading(false);
     }
@@ -73,14 +85,36 @@ export default function MonthlyPage() {
 
   useEffect(() => { fetchData(yearMonth); }, [yearMonth, fetchData]);
 
+  const saveRemark = useCallback(async (staffId: string, date: string) => {
+    const key = `${staffId}_${date}`;
+    const content = editingValue.trim();
+    setEditingCell(null);
+
+    setRemarksMap((prev) => {
+      const next = { ...prev };
+      if (content) {
+        next[key] = content;
+      } else {
+        delete next[key];
+      }
+      return next;
+    });
+
+    await fetch('/api/admin/remarks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staff_id: staffId, date, content }),
+    });
+  }, [editingValue]);
+
   const days = getMonthDays(yearMonth);
 
   const summaries: StaffSummary[] = staffList.map((s) => {
     const myRecords = records.filter((r) => r.staff_id === s.id);
-    const myMemos = memos.filter((m) => m.staff_id === s.id);
+    const myMemos = memos.filter((mm) => mm.staff_id === s.id);
     const daySummaries = days.map((date) => {
       const dayRecs = myRecords.filter((r) => r.work_date === date);
-      const dayMemos = myMemos.filter((m) => m.memo_date === date);
+      const dayMemos = myMemos.filter((mm) => mm.memo_date === date);
       const hasClockedIn = dayRecs.some((r) => r.action === 'clock_in');
       const hasClockedOut = dayRecs.some((r) => r.action === 'clock_out');
       const workHours = dayRecs.length > 0 ? calculateWorkHours(dayRecs) : null;
@@ -90,7 +124,7 @@ export default function MonthlyPage() {
         workHours,
         isOvertime: (workHours ?? 0) > 8,
         hasMissedPunch: hasClockedIn && !hasClockedOut,
-        memo: dayMemos.length > 0 ? dayMemos.map((m) => m.content).join('、') : null,
+        memo: dayMemos.length > 0 ? dayMemos.map((mm) => mm.content).join('、') : null,
       };
     });
     const totalHours = daySummaries.reduce((sum, d) => sum + (d.workHours ?? 0), 0);
@@ -107,7 +141,7 @@ export default function MonthlyPage() {
     window.open(`/api/admin/export?month=${yearMonth}`, '_blank');
   };
 
-  const [y, m] = yearMonth.split('-');
+  const [y, mo] = yearMonth.split('-');
 
   return (
     <div>
@@ -117,7 +151,6 @@ export default function MonthlyPage() {
           <h1 className="text-2xl font-semibold text-md-on-surface tracking-tight">月次集計</h1>
           <p className="text-sm text-md-on-surface-variant mt-1">職員ごとの勤務時間集計</p>
         </div>
-        {/* MD3 Filled Button */}
         <button
           onClick={handleExport}
           className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-medium rounded-md-full hover:shadow-md-2 transition-[box-shadow,background-color] duration-md-s4 ease-md-standard active:bg-primary-dark"
@@ -127,7 +160,7 @@ export default function MonthlyPage() {
         </button>
       </div>
 
-      {/* MD3 month navigator */}
+      {/* Month navigator */}
       <div className="flex items-center gap-4 mb-6">
         <button
           onClick={() => setYearMonth(shiftMonth(yearMonth, -1))}
@@ -136,7 +169,7 @@ export default function MonthlyPage() {
           <ChevronLeft className="w-5 h-5 text-md-on-surface-variant" />
         </button>
         <h2 className="text-lg font-semibold text-md-on-surface font-dm min-w-[7rem] text-center">
-          {y}年{m}月
+          {y}年{mo}月
         </h2>
         <button
           onClick={() => setYearMonth(shiftMonth(yearMonth, 1))}
@@ -155,7 +188,7 @@ export default function MonthlyPage() {
               key={s.staff.id}
               className="bg-md-surface rounded-md-xl shadow-md-1 overflow-hidden"
             >
-              {/* Staff header row */}
+              {/* Staff header */}
               <button
                 onClick={() =>
                   setExpandedStaff(expandedStaff === s.staff.id ? null : s.staff.id)
@@ -198,55 +231,101 @@ export default function MonthlyPage() {
                           <th className="text-left px-6 py-2.5 font-medium">日付</th>
                           <th className="text-left px-6 py-2.5 font-medium">勤務時間</th>
                           <th className="text-left px-6 py-2.5 font-medium">打刻記録</th>
-                          <th className="text-left px-6 py-2.5 font-medium">備考</th>
+                          <th className="text-left px-6 py-2.5 font-medium min-w-[160px]">
+                            備考
+                            <span className="ml-1.5 text-[10px] font-normal text-md-on-surface-variant/50">クリックで編集</span>
+                          </th>
                           <th className="text-left px-6 py-2.5 font-medium">連絡メモ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-md-outline-variant/30">
                         {s.days
-                          .filter((d) => d.records.length > 0 || d.memo)
-                          .map((d) => (
-                            <tr key={d.date} className="hover:bg-md-surface-container transition-colors duration-md-s4">
-                              <td className="px-6 py-2.5 font-dm text-md-on-surface-variant">
-                                {d.date.slice(5).replace('-', '/')}
-                              </td>
-                              <td className="px-6 py-2.5 font-dm font-medium">
-                                {d.workHours !== null ? (
-                                  <span className={d.isOvertime ? 'text-md-on-warning-container' : 'text-md-on-surface'}>
-                                    {d.workHours}h
-                                  </span>
-                                ) : (
-                                  <span className="text-md-on-surface-variant/40">—</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-2.5">
-                                <div className="flex flex-wrap gap-1">
-                                  {d.records.map((r) => (
-                                    <span
-                                      key={r.id}
-                                      className="text-xs bg-md-surface-container text-md-on-surface-variant px-2.5 py-0.5 rounded-md-xs font-dm"
-                                    >
-                                      {ACTION_LABELS[r.action as ActionType]}{' '}
-                                      {formatTime(r.timestamp)}
+                          .filter((d) => d.records.length > 0 || d.memo || remarksMap[`${s.staff.id}_${d.date}`])
+                          .map((d) => {
+                            const remarkKey = `${s.staff.id}_${d.date}`;
+                            const remark = remarksMap[remarkKey];
+                            const isEditing =
+                              editingCell?.staffId === s.staff.id && editingCell?.date === d.date;
+                            return (
+                              <tr
+                                key={d.date}
+                                className="hover:bg-md-surface-container transition-colors duration-md-s4"
+                              >
+                                <td className="px-6 py-2.5 font-dm text-md-on-surface-variant">
+                                  {d.date.slice(5).replace('-', '/')}
+                                </td>
+                                <td className="px-6 py-2.5 font-dm font-medium">
+                                  {d.workHours !== null ? (
+                                    <span className={d.isOvertime ? 'text-md-on-warning-container' : 'text-md-on-surface'}>
+                                      {d.workHours}h
                                     </span>
-                                  ))}
-                                </div>
-                              </td>
-                              <td className="px-6 py-2.5 text-xs">
-                                {d.hasMissedPunch && (
-                                  <span className="text-md-on-error-container">退勤未打刻</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-2.5 text-xs text-md-on-surface-variant max-w-xs">
-                                {d.memo ? (
-                                  <span className="whitespace-pre-wrap">{d.memo}</span>
-                                ) : (
-                                  <span className="text-md-on-surface-variant/30">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        {s.days.filter((d) => d.records.length > 0 || d.memo).length === 0 && (
+                                  ) : (
+                                    <span className="text-md-on-surface-variant/40">—</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-2.5">
+                                  <div className="flex flex-wrap gap-1">
+                                    {d.records.map((r) => (
+                                      <span
+                                        key={r.id}
+                                        className="text-xs bg-md-surface-container text-md-on-surface-variant px-2.5 py-0.5 rounded-md-xs font-dm"
+                                      >
+                                        {ACTION_LABELS[r.action as ActionType]}{' '}
+                                        {formatTime(r.timestamp)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-2.5 text-xs min-w-[160px]">
+                                  <div className="space-y-1">
+                                    {d.hasMissedPunch && (
+                                      <span className="block text-md-on-error-container font-medium">
+                                        退勤未打刻
+                                      </span>
+                                    )}
+                                    {isEditing ? (
+                                      <input
+                                        autoFocus
+                                        value={editingValue}
+                                        onChange={(e) => setEditingValue(e.target.value)}
+                                        onBlur={() => saveRemark(s.staff.id, d.date)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') saveRemark(s.staff.id, d.date);
+                                          if (e.key === 'Escape') setEditingCell(null);
+                                        }}
+                                        className="w-full text-xs border-b border-primary outline-none bg-transparent py-0.5 text-md-on-surface placeholder:text-md-on-surface-variant/40"
+                                        placeholder="備考を入力…"
+                                      />
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          setEditingCell({ staffId: s.staff.id, date: d.date });
+                                          setEditingValue(remark ?? '');
+                                        }}
+                                        className="w-full text-left group"
+                                      >
+                                        {remark ? (
+                                          <span className="text-md-on-surface">{remark}</span>
+                                        ) : (
+                                          <span className="text-md-on-surface-variant/30 group-hover:text-md-on-surface-variant transition-colors">
+                                            —
+                                          </span>
+                                        )}
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-2.5 text-xs text-md-on-surface-variant max-w-xs">
+                                  {d.memo ? (
+                                    <span className="whitespace-pre-wrap">{d.memo}</span>
+                                  ) : (
+                                    <span className="text-md-on-surface-variant/30">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        {s.days.filter((d) => d.records.length > 0 || d.memo || remarksMap[`${s.staff.id}_${d.date}`]).length === 0 && (
                           <tr>
                             <td colSpan={5} className="px-6 py-4 text-center text-md-on-surface-variant/40 text-sm">
                               記録なし

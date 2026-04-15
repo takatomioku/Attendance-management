@@ -66,6 +66,23 @@ CREATE POLICY "Public insert memos" ON staff_memos
 CREATE POLICY "Public read memos" ON staff_memos
   FOR SELECT USING (true);
 
+-- 管理者が入力する日別備考テーブル
+CREATE TABLE IF NOT EXISTS daily_remarks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  remark_date DATE NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(staff_id, remark_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_remarks_staff_date ON daily_remarks(staff_id, remark_date);
+
+ALTER TABLE daily_remarks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all for daily_remarks" ON daily_remarks
+  FOR ALL USING (true) WITH CHECK (true);
+
 -- =============================================
 -- 初期データ：職員
 -- =============================================

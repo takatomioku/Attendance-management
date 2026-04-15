@@ -40,6 +40,13 @@ export interface StaffMemo {
   created_at: string;
 }
 
+export interface DailyRemark {
+  id: string;
+  staff_id: string;
+  remark_date: string;
+  content: string;
+}
+
 export interface DailyStaffStatus {
   staff: Staff;
   status: AttendanceStatus;
