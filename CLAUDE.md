@@ -44,8 +44,9 @@ rm -rf .next node_modules && npm install
 | `/api/attendance/status` | GET | 職員の最終打刻状態取得（単件、現在未使用） |
 | `/api/admin/records` | GET / POST | 管理者用打刻記録の取得・追加 |
 | `/api/admin/records/[id]` | PUT / DELETE | 個別レコードの編集・削除 |
-| `/api/admin/export` | GET | Excelエクスポート（職員別シート、J列に連絡メモ） |
+| `/api/admin/export` | GET | Excelエクスポート（職員別シート、J列に連絡メモ、K列に備考） |
 | `/api/admin/cleanup` | GET / DELETE | 古いデータの件数確認・一括削除 |
+| `/api/admin/remarks` | GET / PUT | 管理者備考の取得（`?month=YYYY-MM`）・upsert/削除 |
 | `/api/memos` | GET / POST | 連絡メモの取得・投稿（`?month=YYYY-MM` でフィルタ） |
 
 ### 管理者画面一覧
@@ -143,7 +144,7 @@ clock_out → clock_in  （複数セッション対応）
 
 `/api/admin/export?month=YYYY-MM` が `.xlsx` を返す（`xlsx` ライブラリ使用）:
 - 職員ごとに1シート（シート名 = 職員名）
-- A列: 日付、B〜I列: 出勤・退勤・休憩開始・休憩終了・外出・帰院・夜間当番開始・夜間当番終了、**J列: 連絡メモ**（同日の `staff_memos` を「、」で結合）
+- A列: 日付、B〜I列: 出勤・退勤・休憩開始・休憩終了・外出・帰院・夜間当番開始・夜間当番終了、**J列: 連絡メモ**（同日の `staff_memos` を「、」で結合）、**K列: 備考**（`daily_remarks`）
 
 ## UIデザイン方針
 
@@ -213,7 +214,8 @@ setState(Array.isArray(data) ? data : []);
 `supabase/schema.sql` に定義。テーブル:
 - `staff`: 職員マスタ（id, name, display_order）
 - `attendance_records`: 打刻記録（staff_id, action, timestamp, work_date, note）
-- `staff_memos`: 連絡メモ（staff_id, memo_date, content）
+- `staff_memos`: 連絡メモ（staff_id, memo_date, content）— 職員が打刻画面から投稿
+- `daily_remarks`: 管理者備考（staff_id, remark_date, content）— 管理者が月次画面からインライン編集。`(staff_id, remark_date)` にユニーク制約
 
 `action` の値: `clock_in` / `clock_out` / `break_start` / `break_end` / `go_out` / `return` / `night_duty_start` / `night_duty_end`
 
