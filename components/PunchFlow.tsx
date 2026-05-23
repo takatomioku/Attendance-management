@@ -78,9 +78,11 @@ const fadeSlide = {
 export function PunchFlow({
   staffList,
   initialStatuses,
+  incompleteDates,
 }: {
   staffList: Staff[];
   initialStatuses: Record<string, ActionType | null>;
+  incompleteDates: Record<string, string[]>;
 }) {
   const [step, setStep] = useState<Step>('select_name');
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
@@ -359,6 +361,21 @@ export function PunchFlow({
                     </span>
                   </div>
                 </div>
+
+                {selectedAction === 'clock_in' && selectedStaff && (incompleteDates[selectedStaff.id]?.length ?? 0) > 0 && (
+                  <div className="flex items-start gap-2 text-md-on-warning-container text-sm bg-md-warning-container rounded-md-md p-3 mb-4">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-medium">未退勤の打刻があります</p>
+                      <p className="text-xs">
+                        {incompleteDates[selectedStaff.id].map(dateWithDow).join('、')}
+                      </p>
+                      <p className="text-xs opacity-90">
+                        管理者に連絡してください。このまま打刻する場合は「確定する」を押してください。
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {error && (
                   <div className="flex items-center gap-2 text-md-on-error-container text-sm bg-md-error-container rounded-md-md p-3 mb-4">
