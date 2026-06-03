@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { IpAllowlistSettings } from '@/components/admin/IpAllowlistSettings';
 
 const PRESETS = [
   { label: '3ヶ月より前', months: 3 },
@@ -197,6 +198,8 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      <IpAllowlistSettings />
     </div>
   );
 }

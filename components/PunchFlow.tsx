@@ -160,12 +160,15 @@ export function PunchFlow({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ staff_id: selectedStaff.id, action: selectedAction }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || '打刻に失敗しました。もう一度お試しください。');
+      }
       // 打刻成功後にローカルステータスを更新（ページ再読み込みなしで次の操作を正しく表示）
       setCurrentStatuses((prev) => ({ ...prev, [selectedStaff.id]: selectedAction }));
       setStep('success');
-    } catch {
-      setError('打刻に失敗しました。もう一度お試しください。');
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : '打刻に失敗しました。もう一度お試しください。');
     } finally {
       setLoading(false);
     }

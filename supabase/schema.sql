@@ -84,6 +84,30 @@ CREATE POLICY "Allow all for daily_remarks" ON daily_remarks
   FOR ALL USING (true) WITH CHECK (true);
 
 -- =============================================
+-- 院内Wi-Fi打刻制限
+-- =============================================
+
+-- アプリ設定（キーバリュー）。ip_restriction_enabled = true/false を保持
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 打刻を許可するIP/CIDRの一覧（IPv4・IPv6両対応）
+CREATE TABLE IF NOT EXISTS ip_allowlist (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  label TEXT,
+  cidr TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLSを有効化（公開ポリシーは付けない＝匿名からは読めない）。
+-- APIルートは service_role キーで操作するためRLSをバイパスできる。
+ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ip_allowlist ENABLE ROW LEVEL SECURITY;
+
+-- =============================================
 -- 初期データ：職員
 -- =============================================
 

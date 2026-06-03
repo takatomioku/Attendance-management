@@ -47,6 +47,7 @@ rm -rf .next node_modules && npm install
 | `/api/admin/export` | GET | Excelエクスポート（職員別シート、J列に連絡メモ、K列に備考） |
 | `/api/admin/cleanup` | GET / DELETE | 古いデータの件数確認・一括削除 |
 | `/api/admin/remarks` | GET / PUT | 管理者備考の取得（`?month=YYYY-MM`）・upsert/削除 |
+| `/api/admin/ip-allowlist` | GET / POST / DELETE | 院内Wi-Fi打刻制限の設定取得・ON/OFF切替・許可IP追加/削除 |
 | `/api/memos` | GET / POST | 連絡メモの取得・投稿（`?month=YYYY-MM` でフィルタ） |
 
 ### 管理者画面一覧
@@ -56,7 +57,7 @@ rm -rf .next node_modules && npm install
 | `/admin` | ダッシュボード（当日の職員ステータス一覧） |
 | `/admin/monthly` | 月次集計 |
 | `/admin/edit` | 打刻修正（レコードの追加・編集・削除） |
-| `/admin/settings` | 設定（古いデータの一括削除） |
+| `/admin/settings` | 設定（古いデータの一括削除・院内Wi-Fi打刻制限） |
 
 `app/admin/layout.tsx` が管理者共通レイアウト（ナビゲーション・ログアウトボタン）を提供。
 
@@ -119,6 +120,21 @@ clock_out → clock_in  （複数セッション対応）
 
 - `next.config.js` で `experimental.staleTimes.dynamic = 0` を設定（Router Cache無効化）
 - `components/admin/DashboardRefresher.tsx`（Client Component）がマウント時と30秒ごとに `router.refresh()` を呼ぶ
+
+### 院内Wi-Fi打刻制限
+
+職員が院内ネットワークからのみ打刻できるようにする仕組み。
+
+- 判定の基準は**院内回線のグローバルIP**（プロバイダがWAN側に割り当てるIP）。LAN内のプライベートIP（192.168.x.x）はVercelからは見えない。
+- リクエスト元IPは `lib/ip.ts` の `getClientIp()` が `x-forwarded-for` の先頭から取得（Vercelが設定）。
+- 照合は `lib/ip.ts` の CIDR マッチで行い、**IPv4 / IPv6 両対応**（BigIntでビット演算）。`::ffff:1.2.3.4` のIPv4射影アドレスはIPv4に正規化。
+- ゲート判定は `lib/ip-gate.ts` の `getIpGateState()`。打刻API（`/api/attendance` POST）と管理API（`/api/admin/ip-allowlist` GET）の両方で使う。
+- **fail-open設計（締め出し防止）**: 制限OFF時、または許可リストが空（=未設定・マイグレーション未実行）の場合は常に許可。設定ミスで全員が打刻不能になる事故を防ぐ。テーブルが存在しない場合もエラーを握り潰して許可する。
+- 許可IPの提案 `suggestCidr()`: IPv4は `/32`（同一回線の端末はNATで同じグローバルIPになる）、IPv6は `/64` プレフィックス（端末ごとにアドレスが変わるためネットワーク単位で許可）。
+- 管理UIは `components/admin/IpAllowlistSettings.tsx`（`/admin/settings` に配置）。今サーバーに見えているIPの表示、ワンクリック登録、手動CIDR追加、ON/OFFトグルを提供。**動的IP対策**として、回線IPが変わったら院内端末でこの画面を開き「この端末のIPを追加」を押すだけで更新できる。
+- ブロック時は打刻APIが `403 { code: 'ip_blocked' }` を返し、`PunchFlow.tsx` がそのメッセージ（管理者に伝えるIP付き）を画面に表示する。ブロックはサーバーログにも `console.warn` で記録。
+- **認証**: `/api/admin/ip-allowlist` は `lib/auth.ts` の `isAuthenticated()`（`createSessionClient().auth.getUser()`）で各ハンドラをガードする。middleware は `/admin/:path*`（ページ）のみ保護し `/api/admin/*` は対象外のため、APIルート側で明示的に認証する。
+- **既知の限界**: IP制限は「自宅・外出先からの打刻防止」には有効だが万能ではない。(1) v6プラス等のIPoEでグローバルIPv4が他事業者と共有(CGN)される場合、同一IPの第三者を誤って許可しうる。(2) フレッツのIPv6委任プレフィックスが /56・/48 の環境では端末ごとに /64 が変わるため、必要に応じて手動で短いプレフィックスを登録する。物理QR運用との併用が前提。
 
 ### タイムゾーン
 
@@ -216,6 +232,10 @@ setState(Array.isArray(data) ? data : []);
 - `attendance_records`: 打刻記録（staff_id, action, timestamp, work_date, note）
 - `staff_memos`: 連絡メモ（staff_id, memo_date, content）— 職員が打刻画面から投稿
 - `daily_remarks`: 管理者備考（staff_id, remark_date, content）— 管理者が月次画面からインライン編集。`(staff_id, remark_date)` にユニーク制約
+- `app_settings`: アプリ設定のキーバリュー（key, value(JSONB)）— `ip_restriction_enabled` で打刻制限のON/OFFを保持
+- `ip_allowlist`: 打刻を許可するIP/CIDR一覧（label, cidr）— IPv4・IPv6両対応
+
+`app_settings` / `ip_allowlist` は公開RLSポリシーを付けない（匿名からは読めない）。打刻API・管理APIは `createServiceClient()`（service_role）でRLSをバイパスして読む。
 
 `action` の値: `clock_in` / `clock_out` / `break_start` / `break_end` / `go_out` / `return` / `night_duty_start` / `night_duty_end`
 
