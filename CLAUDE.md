@@ -83,6 +83,12 @@ rm -rf .next node_modules && npm install
 
 `PunchFlow.tsx` はこれを `currentStatuses` ローカル状態に持ち、打刻成功のたびに該当職員のステータスを更新する。これによりページ再読み込みなしでも、連続打刻時に正しい次のアクションが表示される。`/api/attendance/status` はルートとして存在するが打刻画面からは呼ばれない。
 
+### 未退勤の警告（incompleteDates）
+
+`app/page.tsx` は当日記録とは別に、**過去7日**（`weekAgo <= work_date < today`）の打刻も取得する。`(staff_id, work_date)` ごとの最終アクションが `clock_out` でない日を「未退勤」とみなし、`incompleteDates: Record<string, string[]>`（職員ID→日付配列）として `PunchFlow` へ渡す。
+
+`PunchFlow.tsx` の確認画面で、選択アクションが `clock_in` かつ該当職員に未退勤の日があるとき、退勤忘れの警告を表示する（打刻自体はブロックせず「確定する」で続行可能）。
+
 ### PunchFlow のステップ遷移
 
 `components/PunchFlow.tsx` は打刻・連絡メモ・タイムカード確認の3系統を持つ：
@@ -244,6 +250,23 @@ setState(Array.isArray(data) ? data : []);
 - ホスティング: Vercel（GitHub `main` ブランチへのpushで自動デプロイ）
 - リポジトリ: `takatomioku/Attendance-management`（Public）
 - Supabase の **Authentication → URL Configuration** に Vercel の URL を設定しないと管理者ログイン不可
+
+## バックアップ
+
+`.github/workflows/db-backup.yml` が毎日 JST 3:00 に `public` スキーマを `pg_dump`（custom形式）し、GPG（AES256）で暗号化して Actions の Artifact に保存する（90日保持）。手動実行は Actions タブの「Run workflow」。
+
+- **暗号化は必須**: リポジトリが Public のため、平文の Artifact は第三者にダウンロードされうる。
+- Secrets: `SUPABASE_DB_URL`（Connect → **Session pooler** の接続文字列。Direct connection は IPv6 のみで Actions から繋がらない）、`BACKUP_PASSPHRASE`（紛失すると復元不可）。
+- `auth` スキーマ（管理者アカウント）は対象外。復元時は管理者ユーザーを作り直す。
+- Public リポジトリは60日間コミットがないと scheduled workflow が自動停止する。停止したら Actions タブで再有効化する。
+- 失敗時は GitHub からメール通知が届く。
+
+復元手順:
+```bash
+gpg --decrypt attendance-YYYYMMDD-HHMM.dump.gpg > backup.dump
+# 既存テーブルを置き換えて復元（--clean は既存データを削除するので注意）
+pg_restore --clean --if-exists --no-owner --no-privileges -d "$SUPABASE_DB_URL" backup.dump
+```
 
 ## 注意事項
 

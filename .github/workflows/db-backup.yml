@@ -1,0 +1,65 @@
+# Supabase DB の日次バックアップ
+#
+# 毎日 JST 3:00 に public スキーマ（職員・打刻・メモ・備考・設定）を pg_dump し、
+# パスフレーズで AES256 暗号化してから GitHub Actions の Artifact として保存する。
+# リポジトリが Public のため、平文の Artifact は第三者にダウンロードされうる。必ず暗号化すること。
+#
+# 必要な Secrets（Settings → Secrets and variables → Actions）:
+#   SUPABASE_DB_URL       Supabase の Connect → Session pooler の接続文字列（パスワード込み）
+#                         ※ Direct connection は IPv6 のみで GitHub Actions から繋がらない
+#   BACKUP_PASSPHRASE     暗号化パスフレーズ（紛失すると復元不可。院内で別途保管）
+
+name: DB Backup
+
+on:
+  schedule:
+    - cron: '0 18 * * *' # UTC 18:00 = JST 3:00
+  workflow_dispatch: # 手動実行（Actions タブの「Run workflow」）
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check secrets
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::SUPABASE_DB_URL または BACKUP_PASSPHRASE が未設定です"
+            exit 1
+          fi
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          # Supabase の PostgreSQL より新しい pg_dump が必要なため postgres:17 イメージを使う
+          docker run --rm -e SUPABASE_DB_URL -v "$PWD:/out" postgres:17-alpine \
+            sh -c 'pg_dump "$SUPABASE_DB_URL" --schema=public --no-owner --no-privileges -Fc -f /out/backup.dump \
+              && pg_restore --list /out/backup.dump > /out/toc.txt'
+          echo "テーブル一覧:"
+          grep "TABLE DATA" toc.txt
+          ls -l backup.dump
+
+      - name: Encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          STAMP=$(TZ=Asia/Tokyo date +%Y%m%d-%H%M)
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          gpg --batch --yes --symmetric --cipher-algo AES256 \
+            --passphrase-fd 0 -o "attendance-$STAMP.dump.gpg" backup.dump <<< "$BACKUP_PASSPHRASE"
+          rm -f backup.dump
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendance-backup-${{ env.STAMP }}
+          path: attendance-${{ env.STAMP }}.dump.gpg
+          retention-days: 90
+          if-no-files-found: error
