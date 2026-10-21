@@ -44,7 +44,7 @@ rm -rf .next node_modules && npm install
 | `/api/attendance/status` | GET | 職員の最終打刻状態取得（単件、現在未使用） |
 | `/api/admin/records` | GET / POST | 管理者用打刻記録の取得・追加 |
 | `/api/admin/records/[id]` | PUT / DELETE | 個別レコードの編集・削除 |
-| `/api/admin/export` | GET | Excelエクスポート（職員別シート、J列に連絡メモ、K列に備考） |
+| `/api/admin/export` | GET | Excelエクスポート（職員別シート、J列に連絡メモ、K列に備考、L列に有給） |
 | `/api/admin/cleanup` | GET / DELETE | 古いデータの件数確認・一括削除 |
 | `/api/admin/remarks` | GET / PUT | 管理者備考の取得（`?month=YYYY-MM`）・upsert/削除 |
 | `/api/admin/ip-allowlist` | GET / POST / DELETE | 院内Wi-Fi打刻制限の設定取得・ON/OFF切替・許可IP追加/削除 |
@@ -168,7 +168,11 @@ clock_out → clock_in  （複数セッション対応）
 
 `/api/admin/export?month=YYYY-MM` が `.xlsx` を返す（`xlsx` ライブラリ使用）:
 - 職員ごとに1シート（シート名 = 職員名）
-- A列: 日付、B〜I列: 出勤・退勤・休憩開始・休憩終了・外出・帰院・夜間当番開始・夜間当番終了、**J列: 連絡メモ**（同日の `staff_memos` を「、」で結合）、**K列: 備考**（`daily_remarks`）
+- A列: 日付、B〜I列: 出勤・退勤・休憩開始・休憩終了・外出・帰院・夜間当番開始・夜間当番終了、**J列: 連絡メモ**（同日の `staff_memos` を「、」で結合）、**K列: 備考**（`daily_remarks`）、**L列: 有給**
+- L列は**有給管理アプリ（別Supabaseプロジェクト・Prisma）のDB**を `lib/leave.ts` の `fetchMonthlyLeaves()` が `pg` で直接読む（読み取りのみ）。承認済みの `ANNUAL`→「有給（1日）」、`HALF_DAY`→「有給（午前半休）/（午後半休）」、`HOURLY`→「時間休（N時間）」。複数日の申請は1日ずつ展開。シート末尾に「有給合計」行
+- 職員の紐付けは**名前**（空白を除去して比較）。両アプリで漢字が違うと紐付かないので、職員名を変えるときは両方を揃える
+- 日付は `to_char` で文字列化して取得する（pg の Date 変換はローカルTZの影響を受けるため）
+- 有給DBの取得に失敗しても勤怠の出力は続行し、ヘッダーが「有給（取得失敗）」になる（サーバーログに `[export]`）
 
 ## UIデザイン方針
 
@@ -231,6 +235,7 @@ setState(Array.isArray(data) ? data : []);
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 公開可 | 匿名キー（Auth用） |
 | `SUPABASE_SERVICE_ROLE_KEY` | **秘密** | サービスロールキー（APIルートのみ） |
 | `IP_AUTO_UPDATE_TOKEN` | **秘密** | IP自動更新API用の共有トークン（IP監視プログラムの `allowlist_api_token` と同じ値） |
+| `LEAVE_DATABASE_URL` | **秘密** | 有給管理アプリのDB接続URL（有給アプリの `DATABASE_URL` と同じ値。Excelエクスポートの有給列で使用） |
 
 `SUPABASE_SERVICE_ROLE_KEY` は絶対に `NEXT_PUBLIC_` をつけない。
 

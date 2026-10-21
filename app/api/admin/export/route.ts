@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { formatTime } from '@/lib/utils';
 import { ActionType } from '@/types';
+import { fetchMonthlyLeaves, formatLeaveEntry, normalizeName, LeaveEntry } from '@/lib/leave';
 import * as XLSX from 'xlsx';
 
 const ACTION_COLUMNS: ActionType[] = [
@@ -11,10 +12,10 @@ const ACTION_COLUMNS: ActionType[] = [
 
 const COLUMN_HEADERS = [
   '日付', '出勤', '退勤', '休憩開始', '休憩終了',
-  '外出', '帰院', '夜間当番開始', '夜間当番終了', '連絡メモ', '備考',
+  '外出', '帰院', '夜間当番開始', '夜間当番終了', '連絡メモ', '備考', '有給',
 ];
 
-const COL_WIDTHS = [12, 8, 8, 10, 10, 8, 8, 14, 14, 40, 40];
+const COL_WIDTHS = [12, 8, 8, 10, 10, 8, 8, 14, 14, 40, 40, 20];
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -50,6 +51,14 @@ export async function GET(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // 有給管理アプリ（別DB）の承認済み休暇。取得に失敗しても勤怠の出力は続行する
+  let leaves: Map<string, Map<string, LeaveEntry[]>> | null = null;
+  try {
+    leaves = await fetchMonthlyLeaves(month, nextMonth);
+  } catch (e) {
+    console.error('[export] 有給データの取得に失敗', e);
+  }
+
   const records = data ?? [];
   const staff = staffList ?? [];
   const memos = memosData ?? [];
@@ -68,7 +77,13 @@ export async function GET(request: NextRequest) {
     const myMemos = memos.filter((memo: any) => memo.staff_id === s.id);
     const myRemarks = remarks.filter((rk: any) => rk.staff_id === s.id);
 
-    const sheetData: string[][] = [COLUMN_HEADERS];
+    const myLeaves = leaves?.get(normalizeName(s.name));
+
+    const headers = leaves ? COLUMN_HEADERS : [...COLUMN_HEADERS.slice(0, -1), '有給（取得失敗）'];
+    const sheetData: string[][] = [headers];
+    let fullDays = 0;
+    let halfDays = 0;
+    let hourlyHours = 0;
 
     for (const date of days) {
       const dayRecs = myRecords.filter((r: any) => r.work_date === date);
@@ -81,7 +96,23 @@ export async function GET(request: NextRequest) {
       }
       row.push(dayMemos.map((memo: any) => memo.content).join('、'));
       row.push(dayRemark ? dayRemark.content : '');
+      const dayLeaves = myLeaves?.get(date) ?? [];
+      for (const lv of dayLeaves) {
+        if (lv.type === 'ANNUAL') fullDays++;
+        else if (lv.type === 'HALF_DAY') halfDays++;
+        else hourlyHours += lv.hours ?? 0;
+      }
+      row.push(dayLeaves.map(formatLeaveEntry).join('、'));
       sheetData.push(row);
+    }
+
+    if (leaves) {
+      const total = fullDays + halfDays * 0.5;
+      const summary =
+        `有給 1日×${fullDays}日、半休×${halfDays}回（計${total}日）` +
+        (hourlyHours > 0 ? `、時間休 計${hourlyHours}時間` : '');
+      sheetData.push([]);
+      sheetData.push(['有給合計', ...Array(COLUMN_HEADERS.length - 2).fill(''), summary]);
     }
 
     const sheet = XLSX.utils.aoa_to_sheet(sheetData);
