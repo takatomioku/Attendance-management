@@ -48,6 +48,7 @@ rm -rf .next node_modules && npm install
 | `/api/admin/cleanup` | GET / DELETE | 古いデータの件数確認・一括削除 |
 | `/api/admin/remarks` | GET / PUT | 管理者備考の取得（`?month=YYYY-MM`）・upsert/削除 |
 | `/api/admin/ip-allowlist` | GET / POST / DELETE | 院内Wi-Fi打刻制限の設定取得・ON/OFF切替・許可IP追加/削除 |
+| `/api/admin/ip-allowlist/auto` | POST | IP監視プログラムからの許可IP自動更新（Bearerトークン認証） |
 | `/api/memos` | GET / POST | 連絡メモの取得・投稿（`?month=YYYY-MM` でフィルタ） |
 
 ### 管理者画面一覧
@@ -140,6 +141,7 @@ clock_out → clock_in  （複数セッション対応）
 - 管理UIは `components/admin/IpAllowlistSettings.tsx`（`/admin/settings` に配置）。今サーバーに見えているIPの表示、ワンクリック登録、手動CIDR追加、ON/OFFトグルを提供。**動的IP対策**として、回線IPが変わったら院内端末でこの画面を開き「この端末のIPを追加」を押すだけで更新できる。
 - ブロック時は打刻APIが `403 { code: 'ip_blocked' }` を返し、`PunchFlow.tsx` がそのメッセージ（管理者に伝えるIP付き）を画面に表示する。ブロックはサーバーログにも `console.warn` で記録。
 - **認証**: `/api/admin/ip-allowlist` は `lib/auth.ts` の `isAuthenticated()`（`createSessionClient().auth.getUser()`）で各ハンドラをガードする。middleware は `/admin/:path*`（ページ）のみ保護し `/api/admin/*` は対象外のため、APIルート側で明示的に認証する。
+- **IP変更時の自動更新**: 院内回線のIPは毎週日曜（AM4〜5時頃）に変わる。院長ノートPCで1時間ごとに動くIP監視プログラム（別リポジトリ `IP_inform_app` の `ip_monitor.py`）が変化を検知すると、`POST /api/admin/ip-allowlist/auto` に `{ newIp, oldIp, host, detectedAt }` を直接送る（失敗時は次回実行で再試行、結果はGmail通知に記載）。APIは管理者セッションではなく環境変数 `IP_AUTO_UPDATE_TOKEN` の Bearer トークンで認証する（未設定なら常に401）。新IPを `自動登録（IP監視）…` ラベルで追加し、旧IPは**同ラベルの行だけ**削除する（手動登録行は消さない）。
 - **既知の限界**: IP制限は「自宅・外出先からの打刻防止」には有効だが万能ではない。(1) v6プラス等のIPoEでグローバルIPv4が他事業者と共有(CGN)される場合、同一IPの第三者を誤って許可しうる。(2) フレッツのIPv6委任プレフィックスが /56・/48 の環境では端末ごとに /64 が変わるため、必要に応じて手動で短いプレフィックスを登録する。物理QR運用との併用が前提。
 
 ### タイムゾーン
@@ -228,6 +230,7 @@ setState(Array.isArray(data) ? data : []);
 | `NEXT_PUBLIC_SUPABASE_URL` | 公開可 | SupabaseプロジェクトURL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 公開可 | 匿名キー（Auth用） |
 | `SUPABASE_SERVICE_ROLE_KEY` | **秘密** | サービスロールキー（APIルートのみ） |
+| `IP_AUTO_UPDATE_TOKEN` | **秘密** | IP自動更新API用の共有トークン（IP監視プログラムの `allowlist_api_token` と同じ値） |
 
 `SUPABASE_SERVICE_ROLE_KEY` は絶対に `NEXT_PUBLIC_` をつけない。
 
